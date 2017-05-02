@@ -5,16 +5,23 @@ from gensim.models.keyedvectors import KeyedVectors
 import sklearn
 import multiprocessing
 import time
-import cPickle
+import cPickle as pickle
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import seaborn as sns
 import evaluation
 from features import overlap_jiabing
+import string
+from nltk import stem
+import chardet
+PUNCT = set(string.punctuation) - set('$%#')
+print PUNCT
 cores = multiprocessing.cpu_count()
 dataset= "wiki"
 UNKNOWN_WORD_IDX = 0
-
+is_stemmed_needed = False
+if is_stemmed_needed:
+    stemmer = stem.lancaster.LancasterStemmer()
 class Alphabet(dict):
     def __init__(self, start_feature_id=1):
         self.fid = start_feature_id
@@ -33,7 +40,7 @@ class Alphabet(dict):
             for k in sorted(self.keys()):
                 out.write("{}\t{}\n".format(k, self[k]))
 
-def load_bin_vec(fname="embedding/GoogleNews-vectors-negative300.bin"):
+def load_bin_vec1(fname="embedding/GoogleNews-vectors-negative300.bin"):
     """
     Loads 300x1 word vecs from Google (Mikolov) word2vec
     """
@@ -45,7 +52,6 @@ def load_bin_vec(fname="embedding/GoogleNews-vectors-negative300.bin"):
         binary_len = np.dtype('float32').itemsize * layer1_size
         print ('vocab_size, layer1_size', vocab_size, layer1_size)
         for i, line in enumerate(range(vocab_size)):
-            print (i)
             if i % 100000 == 0:
                 print ('.',)
             word = []
@@ -60,11 +66,11 @@ def load_bin_vec(fname="embedding/GoogleNews-vectors-negative300.bin"):
 
         return word_vecs,layer1_size
 # get data for lexdecomp
-def load_bin_vec(fname,words):
+def load_bin_vec(words,fname='embedding/GoogleNews-vectors-negative300.bin'):
     print fname
     vocab = set(words)
     word_vecs = {}
-    voc = open('GoogleNews-vectors-300d.voc','w')
+    # voc = open('GoogleNews-vectors-300d.voc','w')
     embedding = []
     with open(fname,'rb') as f:
         header = f.readline()
@@ -84,24 +90,27 @@ def load_bin_vec(fname,words):
                     break
                 if ch != '\n':
                     word.append(ch)
-            temp_word = word.decode('utf-8').lower()
+            if is_stemmed_needed:
+                temp_word = stemmer.stem(word.decode('utf-8').lower())
+            else:
+                temp_word = word.decode('utf-8').lower()
             if temp_word in vocab:
                 # the vector fo word is just like this:'\x01\x02'
                 word_vecs[temp_word] = np.fromstring(f.read(binary_len),dtype = 'float32')
-                voc.write(temp_word + '\n')
+                # voc.write(temp_word + '\n')
                 embedding.append(word_vecs[temp_word])
             else:
                 # print word
                 f.read(binary_len)
         print 'done'
         print 'words found in wor2vec embedding ',len(word_vecs.keys())
-        np.save('GoogleNews-vectors-300d',embedding)
+        # np.save('GoogleNews-vectors-300d',embedding)
         return word_vecs
 def load_text_vec(filename="",embedding_size=100):
     vectors = {}
     for line in open(filename):
         items = line.strip().split(' ')
-        if len(items) ==2:
+        if len(items) == 2:
             vocab_size, embedding_size= items[0],items[1]
             print ( vocab_size, embedding_size)
         else:
@@ -116,10 +125,13 @@ def load_vectors( vectors,vocab,dim_size):
         embeddings.append(vectors.get(word,np.random.uniform(-1,1,dim_size).tolist() ))
     return embeddings
 def encode_to_split(sentence,alphabet,max_sentence = 40):
-    indices=[]
-    tokens=sentence.lower().split()
+    indices = []
+    if is_stemmed_needed:
+        tokens = [stemmer.stem(w.decode('utf-8')) for w in sentence.strip().lower().split() if w not in PUNCT]
+    else:
+        tokens = [w for w in sentence.strip().lower().split() if w not in PUNCT]
     for word in tokens:
-        indices.append(alphabet[str(word)])
+        indices.append(alphabet[word])
     results=indices+[alphabet["END"]]*(max_sentence-len(indices))
     return results[:max_sentence]
 def transform(flag):
@@ -128,14 +140,14 @@ def transform(flag):
     else:
         return [1,0]
 
-def batch_gen_with_single(df,alphabet, batch_size=10):
+def batch_gen_with_single(df,alphabet,batch_size = 10,q_len = 33,a_len = 40):
     pairs=[]
     for index,row in df.iterrows():
-        quetion = encode_to_split(row["question"],alphabet)
-        answer = encode_to_split(row["answer"],alphabet)
+        quetion = encode_to_split(row["question"],alphabet,max_sentence = q_len)
+        answer = encode_to_split(row["answer"],alphabet,max_sentence = a_len)
         pairs.append((quetion,answer))
     # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
-    n_batches= int(len(pairs)*1.0/batch_size)
+    n_batches = int(len(pairs)*1.0/batch_size)
     # pairs = sklearn.utils.shuffle(pairs,random_state =132)
 
     for i in range(0,n_batches):
@@ -184,20 +196,20 @@ def batch_gen_with_point_wise(df,alphabet, batch_size=10,overlap = False,q_len =
     batch= pairs[n_batches*batch_size:] + [pairs[n_batches*batch_size]] * (batch_size- len(pairs)+n_batches*batch_size  )
     yield (np.array([pair[i] for pair in batch])  for i in range(input_num))
 
-def batch_gen_with_pair(df,alphabet, batch_size=10):
+def batch_gen_with_pair(df,alphabet, batch_size=10,q_len = 40,a_len = 40):
     pairs=[]
     for question in df["question"].unique():
         group= df[df["question"]==question]
         pos_answers = group[df["flag"]==1]["answer"]
         neg_answers = group[df["flag"]==0]["answer"].reset_index()
-        question_indices=encode_to_split(question,alphabet)
+        question_indices=encode_to_split(question,alphabet,max_sentence = q_len)
         for pos in pos_answers:
             if len(neg_answers.index)>0:
                 neg_index=np.random.choice(neg_answers.index)
 
                 neg= neg_answers.loc[neg_index,]["answer"]
 
-                pairs.append((question_indices,encode_to_split(pos,alphabet),encode_to_split(neg,alphabet)))
+                pairs.append((question_indices,encode_to_split(pos,alphabet,max_sentence = a_len),encode_to_split(neg,alphabet,max_sentence = a_len)))
     print 'pairs:{}'.format(len(pairs))
     # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
     n_batches= int(len(pairs)*1.0/batch_size)
@@ -207,17 +219,17 @@ def batch_gen_with_pair(df,alphabet, batch_size=10):
         batch = pairs[i*batch_size:(i+1) * batch_size]
         yield ([pair[i] for pair in batch]  for i in range(3))
 
-def batch_gen_with_pair_whole(df,alphabet, batch_size=10):
+def batch_gen_with_pair_whole(df,alphabet, batch_size = 10,q_len = 40,a_len = 40):
     pairs=[]
     for question in df["question"].unique():
         group= df[df["question"]==question]
         pos_answers = group[df["flag"]==1]["answer"]
         neg_answers = group[df["flag"]==0]["answer"]
-        question_indices=encode_to_split(question,alphabet)
+        question_indices=encode_to_split(question,alphabet,max_sentence = q_len)
 
         for pos in pos_answers:
             for neg in neg_answers:                  
-                pairs.append((question_indices,encode_to_split(pos,alphabet),encode_to_split(neg,alphabet)))
+                pairs.append((question_indices,encode_to_split(pos,alphabet,max_sentence = a_len),encode_to_split(neg,alphabet,max_sentence = a_len)))
     print 'pairs:{}'.format(len(pairs))
     # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
     n_batches= int(len(pairs)*1.0/batch_size)
@@ -285,13 +297,13 @@ def load(dataset = dataset, filter=False):
     # train=pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
     test=pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
     dev = pd.read_csv(dev_file,header = None,sep = '\t',names = ['question','answer','flag'],quoting = 3)
-    # if dataset == 'trec':
-    #     train_all_file = os.path.join(data_dir,"train-all.txt")
-    #     train_all = pd.read_csv(train_all_file,header = None,sep = '\t',names = ['qid1','qid2',
-    #     'question','answer','flag'],quoting = 3)
-    #     train = train_all[['question','answer','flag']]
-    # else:
-    train = pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
+    if dataset == 'trec':
+        train_all_file = os.path.join(data_dir,"train-all.txt")
+        train_all = pd.read_csv(train_all_file,header = None,sep = '\t',names = ['qid1','qid2',
+        'question','answer','flag'],quoting = 3)
+        train = train_all[['question','answer','flag']]
+    else:
+        train = pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
 
     if filter == True:
         return removeUnanswerdQuestion(train),removeUnanswerdQuestion(test),removeUnanswerdQuestion(dev)
@@ -309,25 +321,25 @@ def sentence_index(sen, alphabet, input_lens):
     return np.array(sen_index), len(sen)
 
 
-def getSubVectors1(vectors,vocab):
-    embeddings=[]
+def getSubVectorsFromDict(vectors,vocab,dim = 300):
+    embedding = np.zeros((len(vocab),dim))
     for word in vocab:
-
-        if word in vectors.vocab:
-            embeddings.append(vectors.word_vec(word ))
+        if word in vectors:
+            embedding[vocab[word]]= vectors[word]
         else:
-            embeddings.append(np.random.uniform(-1,1,vectors.syn0.shape[1]) ) #.tolist()
+            embedding[vocab[word]]= np.random.uniform(-0.25,0.25,dim) #.tolist()
 
-    return embeddings
+    return embedding
 def getSubVectors(vectors,vocab,dim = 50):
+    print 'embedding_size:',vectors.syn0.shape[1]
     embedding = np.zeros((len(vocab), vectors.syn0.shape[1]))
     for word in vocab:
         if word in vectors.vocab:
             embedding[vocab[word]]= vectors.word_vec(word)
         else:
-            embedding[vocab[word]]= np.random.uniform(-1,1,vectors.syn0.shape[1])  #.tolist()
+            embedding[vocab[word]]= np.random.uniform(-0.5,+0.5,vectors.syn0.shape[1])  #.tolist()
     return embedding
-def prepare(cropuses,is_embedding_needed = False):
+def prepare_300(cropuses):
     alphabet = Alphabet(start_feature_id=0)
     alphabet.add('UNKNOWN_WORD_IDX_0')
     alphabet.add('END')
@@ -337,13 +349,46 @@ def prepare(cropuses,is_embedding_needed = False):
                 tokens = sentence.lower().split()
                 for token in sentence.lower().split():
                     alphabet.add(token)
+    sub_dict_embedding = load_bin_vec(alphabet)
+    sub_embeddings = getSubVectorsFromDict(sub_dict_embedding,alphabet)
+    return alphabet,sub_embeddings
+def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
+    alphabet = Alphabet(start_feature_id=0)
+    alphabet.add('UNKNOWN_WORD_IDX_0')  
+    alphabet.add('END') 
+    count = 0
+    for corpus in cropuses:
+        for texts in [corpus["question"],corpus["answer"]]:
+            for sentence in texts:   
+                tokens = sentence.lower().split()
+                for token in tokens:
+                    if is_stemmed_needed:
+                        # try:
+                        alphabet.add(stemmer.stem(token.decode('utf-8')))
+                        # except Exception as e:
+                        #     alphabet.add(token)
+                        #     print type(e)
+                        count += 1
+                    else:
+
+                        alphabet.add(token)
+    print 'stem error count',count
     if is_embedding_needed:
-        fname="embedding/aquaint+wiki.txt.gz.ndim=50.bin"
-        # vectors,layer1_size= load_bin_vec(fname)
+        sub_vec_file = 'embedding/sub_vector'
+        if os.path.exists(sub_vec_file) and not fresh:
+            sub_embeddings = pickle.load(open(sub_vec_file,'r'))
+        else:            
+            if dim == 50:
+                fname = "embedding/aquaint+wiki.txt.gz.ndim=50.bin"
+            else:
+                fname = 'embedding/GoogleNews-vectors-negative300.bin'
+            embeddings = load_bin_vec(alphabet,fname)
+            sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
+            pickle.dump(sub_embeddings,open(sub_vec_file,'w'))
         # print (len(alphabet.keys()))
-        # embeddings= load_vectors(vectors,alphabet.keys(),layer1_size)
-        embeddings = KeyedVectors.load_word2vec_format(fname, binary=True)
-        sub_embeddings = getSubVectors(embeddings,alphabet)
+        # embeddings = load_vectors(vectors,alphabet.keys(),layer1_size)
+        # embeddings = KeyedVectors.load_word2vec_format(fname, binary=True)
+        # sub_embeddings = getSubVectors(embeddings,alphabet)
         return alphabet,sub_embeddings
     else:
         return alphabet
@@ -384,16 +429,19 @@ def getDataFolexdecomp():
 # load data for trec sigar 2015
 
 def get_alphabet(corpuses):
-    alphabet = Alphabet(start_feature_id=0)
+    alphabet = Alphabet(start_feature_id = 0)
     alphabet.add('UNKNOWN_WORD_IDX')
     for corpus in corpuses:
         for texts in [corpus["question"],corpus["answer"]]:
             for sentence in texts:
                 tokens = sentence.lower().split()
                 for token in sentence.lower().split():
-                    alphabet.add(token)
-    return alphabet
+                    if is_stemmed_needed:
+                        alphabet.add(stemmer.stem(token.decode('utf-8')))
+                    else:
+                        alphabet.add(token)
     print len(alphabet)  
+    return alphabet
 def compute_df(corpus):
     word2df = defaultdict(float)
     numdoc = len(corpus['question']) + len(corpus['answer'])
@@ -520,6 +568,8 @@ def loadData(dataset = dataset):
         print 'qids shape',qids.shape
         print 'flags shape',flags.shape
         print 'question shape',questions_idx.shape
+        print questions_idx
+        exit()
         print 'answer shape',answers_idx.shape
         print 'overlap_feats shape',overlapfeats.shape
 
@@ -612,13 +662,6 @@ def main():
     #     x,y=batch
     #     print (len(x))
         # exit()
-def sampleTest():
-    train_file = os.path.join('data/trec',"train.txt")
-    train = pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
-    alphabet = get_alphabet([train])
-    alphabet.add('END')
-    for question,answer,answer_negtive in batch_gen_with_pair(train,alphabet):
-        print question,answer,answer_negtive
 def random_result():
     train,test,dev = load("wiki",filter = True)
     test = test.reindex(np.random.permutation(test.index))
@@ -627,10 +670,90 @@ def random_result():
     pred = np.random.randn(len(test))
 
     print evaluation.evaluationBypandas(test,pred)
+def dns_sample(df,alphabet,q_len,a_len,sess,model,batch_size,neg_sample_num = 30):
+    samples = []
+    count = 0
+    # neg_answers = df['answer'].reset_index()
+    pool_answers = df[df['flag'] == 1]['answer'].tolist()
+    print 'question unique:{}'.format(len(df['question'].unique()))
+    for question in df['question'].unique():
+        group = df[df['question'] == question]
+        pos_answers = group[df["flag"]==1]["answer"].tolist()
+        pos_answers_exclude = list(set(pool_answers).difference(set(pos_answers)))
+        neg_answers = group[df["flag"]==0]["answer"].tolist()
+        question_indices = encode_to_split(question,alphabet,max_sentence = q_len)
+        for pos in pos_answers:
+            # negtive sample
+            neg_pool = []
+            if len(neg_answers) > 0:
+
+                neg_a = list(np.random.choice(neg_answers,size = neg_sample_num))
+                neg_exc = list(np.random.choice(pos_answers_exclude,size = 100 - neg_sample_num))
+                neg_answers = neg_a + neg_exc
+
+                for neg in neg_answers:
+                    neg_pool.append(encode_to_split(neg,alphabet,max_sentence = a_len))
+                # for i in range(neg_sample_num):
+                #     # neg_index = np.random.choice(neg_answers.index)
+                #     # neg = neg_answers.loc[neg_index]["answer"]
+                #     neg = np.random.choice(neg_answers)
+                #     neg_pool.append((question_indices,encode_to_split(pos,alphabet,max_sentence = a_len),encode_to_split(neg,alphabet,max_sentence = a_len)))
+                # for i in range(30):
+                #     # neg_index = np.random.choice(neg_answers.index)
+                #     # neg = neg_answers.loc[neg_index]["answer"]
+                #     neg = np.random.choice(pos_answers_exclude)
+                #     neg_pool.append((question_indices,encode_to_split(pos,alphabet,max_sentence = a_len),encode_to_split(neg,alphabet,max_sentence = a_len)))
+                # use the model to predict
+                # neg_pool = np.array(neg_pool)
+                # input_x_1 = list(neg_pool[:,0])
+                # input_x_2 = list(neg_pool[:,1])
+                # input_x_3 = list(neg_pool[:,2])
+                input_x_1 = [question_indices] * len(neg_answers)
+                input_x_2 = [encode_to_split(pos,alphabet,max_sentence = a_len)] * len(neg_answers)
+                input_x_3 = neg_pool
+                feed_dict = {
+                    model.question: input_x_1,
+                    model.answer: input_x_2,
+                    model.answer_negative:input_x_3 
+                }
+                predicted = sess.run(model.score13,feed_dict)
+                # find the max score
+                index = np.argmax(predicted)
+                samples.append((question_indices,encode_to_split(pos,alphabet,max_sentence = a_len),input_x_3[index]))      
+                count += 1
+                if count % 100 == 0:
+                    print 'samples load:{}'.format(count)
+    print 'samples finishted len samples:{}'.format(len(samples))
+    return samples
+def batch_gen_with_pair_dns(samples,batch_size):
+    # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
+    n_batches = int(len(samples) * 1.0 / batch_size)
+    pairs = sklearn.utils.shuffle(samples,random_state =132)
+    for i in range(0,n_batches):
+        batch = pairs[i*batch_size:(i+1) * batch_size]
+        yield ([pair[i] for pair in batch]  for i in range(3))           
 if __name__ == '__main__':
-    # sampleTest()
+    train,test,dev = load("wiki",filter = True)
+    q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
+    a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
+    print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
+    print 'train question unique:{}'.format(len(train['question'].unique()))
+    print 'train length',len(train)
+    print 'test length', len(test)
+    print 'dev length', len(dev)
+    alphabet = prepare([train,test,dev],is_embedding_needed = False)
+
+    print 'alphabet:',len(alphabet)
+    load_bin_vec(alphabet)
+        # exit()
+    # word = 'interesting'
+    # print stemmer.stem(word)
+    # train,test,dev = load("wiki",filter = True)
+    # alphabet,embeddings = prepare_300([train,test,dev])
+    # print len(alphabet),len(embeddings)
+    # random_result()
     # data_processing()
-    random_result()
+    # random_result()
     # alphabet = prepare([train,test,dev],is_embedding_needed = False)
     # embedding_file = 'embedding/GoogleNews-vectors-negative300.bin'
     # load_bin_vec(embedding_file,alphabet.keys())

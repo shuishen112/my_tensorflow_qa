@@ -7,7 +7,7 @@ import numpy as np
 class QA(object):
     def __init__(
       self, max_len_left, max_len_right, vocab_size,embedding_size,batch_size,
-      embeddings,dropout_keep_prob,filter_sizes, num_filters,l2_reg_lambda = 0.0, is_Embedding_Needed = False):
+      embeddings,dropout_keep_prob,filter_sizes, num_filters,l2_reg_lambda = 0.0, is_Embedding_Needed = False,trainable=True):
 
         self.question = tf.placeholder(tf.int32,[None,max_len_left],name = 'input_question')
         self.answer = tf.placeholder(tf.int32,[None,max_len_right],name = 'input_answer')
@@ -18,17 +18,19 @@ class QA(object):
         self.embedding_size = embedding_size
         self.batch_size = batch_size
         self.l2_reg_lambda = l2_reg_lambda
+
+        self.para = []
         # Embedding layer for both CNN
         with tf.device('/cpu:0'), tf.name_scope("embedding"):
             if is_Embedding_Needed:
                 print "load embedding"
-                W = tf.Variable(np.array(embeddings),name="W" ,dtype="float32",trainable = False)
+                W = tf.Variable(np.array(embeddings),name="W" ,dtype="float32",trainable = trainable )
             else:
-                W = tf.Variable(tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),name="W",trainable = False)
+                W = tf.Variable(tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),name="W",trainable = trainable)
             self.embedding_W = W
             self.embedded_chars_q = tf.expand_dims(tf.nn.embedding_lookup(W,self.question),-1)
             self.embedded_chars_a = tf.expand_dims(tf.nn.embedding_lookup(W,self.answer),-1)
-
+            self.para.append(self.embedding_W)
         # Create a convolution + maxpool layer for each filter size
         pooled_outputs_left = []
         pooled_outputs_right = []
@@ -37,6 +39,9 @@ class QA(object):
             # Convolution Layer
             W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="W")
             b = tf.Variable(tf.constant(0.1, shape = [num_filters]), name="b")
+            self.para.append(W)
+            self.para.append(b)
+            
             with tf.name_scope("conv-maxpool-left-%s" % filter_size):               
                 conv = tf.nn.conv2d(
                     self.embedded_chars_q,
@@ -91,8 +96,11 @@ class QA(object):
                 shape=[2 * num_filters_total, 2],
                 initializer=tf.contrib.layers.xavier_initializer())
             b = tf.Variable(tf.constant(0.1, shape=[2]), name="b")
-            l2_loss += tf.nn.l2_loss(W)
-            l2_loss += tf.nn.l2_loss(b)
+            self.para.append(W)
+            self.para.append(b)
+
+            for p in self.para:
+                l2_loss += tf.nn.l2_loss(p)            
             self.scores = tf.nn.softmax(tf.nn.xw_plus_b(self.h_drop, W, b, name="scores"))
             self.predictions = tf.argmax(self.scores, 1, name="predictions")
         # CalculateMean cross-entropy loss

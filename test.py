@@ -33,7 +33,7 @@ with tf.Session() as sess:
 # print words
 import tensorflow as tf
 import numpy as np
-
+import numpy
 def testMul():
 	# batch mul
 	batch = 3
@@ -214,18 +214,19 @@ def test_ones():
 		print a.eval()
 
 if __name__ == "__main__":
+	# a = np.arange(100,200)
+	# a = map(str,a)
+	# index = np.random.choice(a,size = [30])
+	# print index
+	a = ['A partly submerged glacier cave on Perito Moreno Glacier .', 'The ice facade is approximately 60 m high', 'Ice formations in the Titlis glacier cave', 'Glacier caves are often called ice caves , but this term is properly used to describe bedrock caves that contain year-round ice .']
+
+	b = np.random.choice(a,2)
+	print a[0]
+	import chardet
+	print chardet.detect(a[0])
 	# testReshape()
 	# test_ones()
-	# testConcolution()
-	filter_shape=[5,3,1]
-	W = tf.Variable(tf.truncated_normal(filter_shape,stddev = 0.1),name = 'W')
-	attention_q = tf.nn.softmax(W,1,name = 'attention_q')
-	with tf.Session() as sess:
-		sess.run(tf.global_variables_initializer())
-		print sess.run(W)
-		test=sess.run(attention_q)
-		print test
-		print test.shape
+	# testConcolution()W
 	# testDropout()
 	# print float(8) / 17
 	# pooling()

@@ -74,17 +74,6 @@ def prediction(sess,cnn,test,alphabet,q_len,a_len):
     score = sess.run(cnn.scores,feed_dict)
     return score
 
-def prediction_2(sess,cnn,test,alphabet,q_len=40,a_len=40):
-    question,answer,overlap = parseData(test,alphabet,q_len,a_len)
-    feed_dict = {
-        cnn.question: question,
-        cnn.answer: answer,
-        cnn.answer_negative: answer     
-    }
-
-    score = sess.run(cnn.score13,feed_dict)
-    return score
-
 def test():
     train,test,dev = load("trec",filter = False)
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
