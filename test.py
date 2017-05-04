@@ -212,18 +212,24 @@ def test_ones():
 	a = tf.ones([100,100,100])
 	with tf.Session() as sess:
 		print a.eval()
-
 if __name__ == "__main__":
 	# a = np.arange(100,200)
 	# a = map(str,a)
 	# index = np.random.choice(a,size = [30])
 	# print index
-	a = ['A partly submerged glacier cave on Perito Moreno Glacier .', 'The ice facade is approximately 60 m high', 'Ice formations in the Titlis glacier cave', 'Glacier caves are often called ice caves , but this term is properly used to describe bedrock caves that contain year-round ice .']
+	# a = ['A partly submerged glacier cave on Perito Moreno Glacier .', 'The ice facade is approximately 60 m high', 'Ice formations in the Titlis glacier cave', 'Glacier caves are often called ice caves , but this term is properly used to describe bedrock caves that contain year-round ice .']
 
-	b = np.random.choice(a,2)
-	print a[0]
-	import chardet
-	print chardet.detect(a[0])
+	# b = np.random.choice(a,2)
+	# print a[0]
+	# import chardet
+	# print chardet.detect(a[0])
+	a = np.random.rand(3,2)
+	b = np.ones((3,2))
+	print a
+	b[:,0] = 0
+	print b
+
+	print np.sum(a * b)
 	# testReshape()
 	# test_ones()
 	# testConcolution()W

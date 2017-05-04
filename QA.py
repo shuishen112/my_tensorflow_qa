@@ -7,11 +7,14 @@ import numpy as np
 class QA(object):
     def __init__(
       self, max_len_left, max_len_right, vocab_size,embedding_size,batch_size,
-      embeddings,dropout_keep_prob,filter_sizes, num_filters,l2_reg_lambda = 0.0, is_Embedding_Needed = False,trainable=True):
+      embeddings,dropout_keep_prob,filter_sizes, 
+      num_filters,l2_reg_lambda = 0.0, is_Embedding_Needed = False,trainable=True,is_overlap = False):
 
         self.question = tf.placeholder(tf.int32,[None,max_len_left],name = 'input_question')
         self.answer = tf.placeholder(tf.int32,[None,max_len_right],name = 'input_answer')
         self.input_y = tf.placeholder(tf.float32, [None,2], name = "input_y")
+        if is_overlap:
+            self.overlap = tf.placeholder(tf.float32,[None,2],name = 'overlap')
         self.dropout_keep_prob = dropout_keep_prob
         self.num_filters = num_filters
         self.embeddings = embeddings
@@ -89,11 +92,15 @@ class QA(object):
 
         with tf.name_scope('dropout'):
             self.h_drop = tf.nn.dropout(self.new_input, self.dropout_keep_prob,name = 'drop_out')
-
+        if is_overlap:
+            self.h_drop = tf.concat(1,[self.h_drop,self.overlap],name = 'new_input_overlap')
+            shape = [2 * num_filters_total + 2, 2]
+        else:
+            shape = [2 * num_filters_total, 2]
         with tf.name_scope("output"):
             W = tf.get_variable(
                 "W_output",
-                shape=[2 * num_filters_total, 2],
+                shape = shape,
                 initializer=tf.contrib.layers.xavier_initializer())
             b = tf.Variable(tf.constant(0.1, shape=[2]), name="b")
             self.para.append(W)

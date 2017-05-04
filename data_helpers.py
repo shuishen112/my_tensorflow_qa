@@ -23,7 +23,7 @@ is_stemmed_needed = False
 if is_stemmed_needed:
     stemmer = stem.lancaster.LancasterStemmer()
 class Alphabet(dict):
-    def __init__(self, start_feature_id=1):
+    def __init__(self, start_feature_id = 1):
         self.fid = start_feature_id
 
     def add(self, item):
@@ -106,15 +106,22 @@ def load_bin_vec(words,fname='embedding/GoogleNews-vectors-negative300.bin'):
         print 'words found in wor2vec embedding ',len(word_vecs.keys())
         # np.save('GoogleNews-vectors-300d',embedding)
         return word_vecs
-def load_text_vec(filename="",embedding_size=100):
+def load_text_vec(alphabet,filename="",embedding_size = 100):
     vectors = {}
-    for line in open(filename):
+    for i,line in enumerate(open(filename)):
+        if i % 100000 == 0:
+                print 'epch %d' % i
         items = line.strip().split(' ')
         if len(items) == 2:
             vocab_size, embedding_size= items[0],items[1]
             print ( vocab_size, embedding_size)
         else:
-            vectors[items[0]] = items[1:]
+            word = items[0]
+            if word in alphabet:
+                vectors[word] = items[1:]
+    print 'embedding_size',embedding_size
+    print 'done'
+    print 'words found in wor2vec embedding ',len(vectors.keys())
     return vectors
 
 def load_vectors( vectors,vocab,dim_size):
@@ -149,7 +156,6 @@ def batch_gen_with_single(df,alphabet,batch_size = 10,q_len = 33,a_len = 40):
     # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
     n_batches = int(len(pairs)*1.0/batch_size)
     # pairs = sklearn.utils.shuffle(pairs,random_state =132)
-
     for i in range(0,n_batches):
         batch = pairs[i*batch_size:(i+1) * batch_size]
 
@@ -202,7 +208,7 @@ def batch_gen_with_pair(df,alphabet, batch_size=10,q_len = 40,a_len = 40):
         group= df[df["question"]==question]
         pos_answers = group[df["flag"]==1]["answer"]
         neg_answers = group[df["flag"]==0]["answer"].reset_index()
-        question_indices=encode_to_split(question,alphabet,max_sentence = q_len)
+        question_indices = encode_to_split(question,alphabet,max_sentence = q_len)
         for pos in pos_answers:
             if len(neg_answers.index)>0:
                 neg_index=np.random.choice(neg_answers.index)
@@ -372,7 +378,6 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
                     else:
 
                         alphabet.add(token)
-    print 'stem error count',count
     if is_embedding_needed:
         sub_vec_file = 'embedding/sub_vector'
         if os.path.exists(sub_vec_file) and not fresh:
@@ -380,10 +385,12 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
         else:            
             if dim == 50:
                 fname = "embedding/aquaint+wiki.txt.gz.ndim=50.bin"
+                embeddings = KeyedVectors.load_word2vec_format(fname, binary=True)
+                sub_embeddings = getSubVectors(embeddings,alphabet)
             else:
-                fname = 'embedding/GoogleNews-vectors-negative300.bin'
-            embeddings = load_bin_vec(alphabet,fname)
-            sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
+                fname = 'embedding/glove.6B/glove.6B.300d.txt'
+                embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
+                sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             pickle.dump(sub_embeddings,open(sub_vec_file,'w'))
         # print (len(alphabet.keys()))
         # embeddings = load_vectors(vectors,alphabet.keys(),layer1_size)
@@ -670,11 +677,12 @@ def random_result():
     pred = np.random.randn(len(test))
 
     print evaluation.evaluationBypandas(test,pred)
-def dns_sample(df,alphabet,q_len,a_len,sess,model,batch_size,neg_sample_num = 30):
+def dns_sample(df,alphabet,q_len,a_len,sess,model,batch_size,neg_sample_num = 10):
     samples = []
     count = 0
     # neg_answers = df['answer'].reset_index()
-    pool_answers = df[df['flag'] == 1]['answer'].tolist()
+    pool_answers = df[df.flag==1]['answer'].tolist()
+    # pool_answers = df[df['flag'] == 0]['answer'].tolist()
     print 'question unique:{}'.format(len(df['question'].unique()))
     for question in df['question'].unique():
         group = df[df['question'] == question]
@@ -686,12 +694,12 @@ def dns_sample(df,alphabet,q_len,a_len,sess,model,batch_size,neg_sample_num = 30
             # negtive sample
             neg_pool = []
             if len(neg_answers) > 0:
-
-                neg_a = list(np.random.choice(neg_answers,size = neg_sample_num))
-                neg_exc = list(np.random.choice(pos_answers_exclude,size = 100 - neg_sample_num))
-                neg_answers = neg_a + neg_exc
-
-                for neg in neg_answers:
+   
+                neg_exc = list(np.random.choice(pos_answers_exclude,size = 100 - len(neg_answers)))
+                neg_answers_sample = neg_answers + neg_exc
+                # neg_answers = neg_a
+                # print 'neg_tive answer:{}'.format(len(neg_answers))
+                for neg in neg_answers_sample:
                     neg_pool.append(encode_to_split(neg,alphabet,max_sentence = a_len))
                 # for i in range(neg_sample_num):
                 #     # neg_index = np.random.choice(neg_answers.index)
@@ -708,8 +716,8 @@ def dns_sample(df,alphabet,q_len,a_len,sess,model,batch_size,neg_sample_num = 30
                 # input_x_1 = list(neg_pool[:,0])
                 # input_x_2 = list(neg_pool[:,1])
                 # input_x_3 = list(neg_pool[:,2])
-                input_x_1 = [question_indices] * len(neg_answers)
-                input_x_2 = [encode_to_split(pos,alphabet,max_sentence = a_len)] * len(neg_answers)
+                input_x_1 = [question_indices] * len(neg_answers_sample)
+                input_x_2 = [encode_to_split(pos,alphabet,max_sentence = a_len)] * len(neg_answers_sample)
                 input_x_3 = neg_pool
                 feed_dict = {
                     model.question: input_x_1,
@@ -719,19 +727,24 @@ def dns_sample(df,alphabet,q_len,a_len,sess,model,batch_size,neg_sample_num = 30
                 predicted = sess.run(model.score13,feed_dict)
                 # find the max score
                 index = np.argmax(predicted)
+                # print len(neg_answers)
+                # print 'index:{}'.format(index)
+                # if len(neg_answers)>1:
+                #     print neg_answers[1]
                 samples.append((question_indices,encode_to_split(pos,alphabet,max_sentence = a_len),input_x_3[index]))      
                 count += 1
                 if count % 100 == 0:
                     print 'samples load:{}'.format(count)
     print 'samples finishted len samples:{}'.format(len(samples))
     return samples
-def batch_gen_with_pair_dns(samples,batch_size):
+def batch_gen_with_pair_dns(samples,batch_size,epoches=1):
     # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
     n_batches = int(len(samples) * 1.0 / batch_size)
-    pairs = sklearn.utils.shuffle(samples,random_state =132)
-    for i in range(0,n_batches):
-        batch = pairs[i*batch_size:(i+1) * batch_size]
-        yield ([pair[i] for pair in batch]  for i in range(3))           
+    for j in range(epoches):
+        pairs = sklearn.utils.shuffle(samples,random_state =132)
+        for i in range(0,n_batches):
+            batch = pairs[i*batch_size:(i+1) * batch_size]
+            yield ([pair[i] for pair in batch]  for i in range(3))           
 if __name__ == '__main__':
     train,test,dev = load("wiki",filter = True)
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))

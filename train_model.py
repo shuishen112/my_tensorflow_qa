@@ -10,7 +10,7 @@ from data_helpers import load,prepare,batch_gen_with_pair,batch_gen_with_single,
 import operator
 from QA import QA
 from qa_overlap import QA_overlap
-from attention_pooling_qa import QA_CNN
+from attentive_pooling_qa import QA_CNN_Attentive
 import random
 import evaluation
 import matplotlib.pyplot as plt
@@ -50,9 +50,9 @@ FLAGS._parse_flags()
 
 
 
-def predict(sess,cnn,test,alphabet,batch_size):
+def predict(sess,cnn,test,alphabet,batch_size,q_len,a_len):
     scores=[]
-    for x_left_batch, x_right_batch in batch_gen_with_single(test,alphabet,batch_size):
+    for x_left_batch, x_right_batch in batch_gen_with_single(test,alphabet,batch_size,q_len,a_len):
         
         feed_dict = {
                         cnn.question: x_left_batch,
@@ -192,6 +192,8 @@ def main():
     train,test,dev = load("wiki",filter = True)
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
     a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
+    q_max_sent_length = 40
+    a_max_sent_length = 40
     print 'train length',len(train)
     print 'test length', len(test)
     print 'dev length', len(dev)
@@ -204,17 +206,18 @@ def main():
             log_device_placement=FLAGS.log_device_placement)
         sess = tf.Session(config=session_conf)
         with sess.as_default(),open("precision.txt","w") as log:
-            cnn = QA_CNN(
-                max_input_left = 40,
-                max_input_right = 40,
+            cnn = QA_CNN_Attentive(
+                max_input_left = q_max_sent_length,
+                max_input_right = a_max_sent_length,
                 batch_size = FLAGS.batch_size,
                 vocab_size=len(alphabet),
                 embeddings = embeddings,
                 embedding_size=FLAGS.embedding_dim,
-                num_filter=FLAGS.num_filters,
+                num_filters = FLAGS.num_filters,
                 dropout_keep_prob = 1.0,
                 l2_reg_lambda=FLAGS.l2_reg_lambda,
-                is_embedding_needded = True)
+                is_Embedding_Needed = True,
+                trainable = True)
 
             # Define Training procedure
             global_step = tf.Variable(0, name="global_step", trainable=False)
@@ -237,9 +240,9 @@ def main():
                     time_str = datetime.datetime.now().isoformat()
                     print("{}: step {}, loss {:g}, acc {:g} positive {:g} negative {:g} mean_pooling {:g}".format(time_str, step, loss, accuracy,np.mean(scores1),np.mean(scores2),np.mean(a1)))
                     # print a1
-                predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size)
+                predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 print (evaluation.evaluationBypandas(train,predicted))
-                predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size)
+                predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 print (evaluation.evaluationBypandas(test,predicted))
                 
                    
