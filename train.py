@@ -9,7 +9,7 @@ from data_helpers import batch_gen_with_pair_dns,dns_sample,load,prepare,batch_g
 import operator
 from QA import QA
 from QA_CNN import QA_CNN
-from attentive_pooling_qa import QA_CNN_Attentive
+from attentive_pooling_network_test import QA_attentive
 import random
 import evaluation
 import cPickle as pickle
@@ -41,7 +41,7 @@ tf.flags.DEFINE_integer("evaluate_every", 500, "Evaluate model on dev set after 
 tf.flags.DEFINE_integer("checkpoint_every", 500, "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_boolean('overlap',False,"is overlap used")
 tf.flags.DEFINE_boolean('dns','False','whether use dns or not')
-tf.flags.DEFINE_string('data','trec','data set')
+tf.flags.DEFINE_string('data','wiki','data set')
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
@@ -201,7 +201,7 @@ def test_pair_wise(dns = FLAGS.dns):
             log.write(str(FLAGS.__flags) + '\n')
             # train,test,dev = load("trec",filter=True)
             # alphabet,embeddings = prepare([train,test,dev],is_embedding_needed = True)
-            cnn = QA_CNN(
+            cnn = QA_attentive(
                 max_input_left = q_max_sent_length,
                 max_input_right = a_max_sent_length,
                 batch_size = FLAGS.batch_size,

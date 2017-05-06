@@ -1,9 +1,6 @@
-#!/usr/bin/env python
-#encoding=utf-8
-
 import tensorflow as tf
 import numpy as np
-class QA_CNN(object):
+class QA_attentive(object):
     def __init__(self,max_input_left,max_input_right,batch_size,vocab_size,embedding_size,filter_sizes,
         num_filters,dropout_keep_prob,embeddings = None,l2_reg_lambda = 0.0,is_Embedding_Needed = False,trainable = True):
 
@@ -12,8 +9,11 @@ class QA_CNN(object):
         self.answer_negative = tf.placeholder(tf.int32,[None,max_input_right],name = 'input_right')
         self.dropout_keep_prob = dropout_keep_prob
         self.num_filters = num_filters
+        self.max_input_left = max_input_left
+        self.max_input_right = max_input_right
         self.embeddings = embeddings
         self.embedding_size = embedding_size
+        self.filter_sizes = filter_sizes
         self.batch_size = batch_size
         self.l2_reg_lambda = l2_reg_lambda
         self.l2_reg_lambda_keep_prob = tf.placeholder(tf.float32, name = "dropout_keep_prob")
@@ -35,102 +35,113 @@ class QA_CNN(object):
         pooled_outputs_2 = []
         pooled_outputs_3 = []
         for i, filter_size in enumerate(filter_sizes):
-            with tf.name_scope("conv-maxpool-%s" % filter_size):
+            with tf.name_scope("conv-%s" % filter_size):
                 filter_shape = [filter_size, embedding_size, 1, num_filters]
                 W = tf.Variable(tf.truncated_normal(filter_shape, stddev = 0.1), name="W")
                 b = tf.Variable(tf.constant(0.0, shape=[num_filters]), name="b")
-
+                self.conv_W = W
+                self.conv_b = b
                 self.para.append(W)
                 self.para.append(b)
                 conv = tf.nn.conv2d(
                     self.embedded_chars_q,
                     W,
-                    strides=[1, 1, 1, 1],
-                    padding='VALID',
+                    strides=[1, 1, embedding_size, 1],
+                    padding='SAME',
                     name="conv-1"
                 )
+
                 print conv
                 h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu-1")
-                pooled = tf.nn.max_pool(
-                    h,
-                    ksize=[1, max_input_left - filter_size + 1, 1, 1],
-                    strides=[1, 1, 1, 1],
-                    padding='VALID',
-                    name="poll-1"
-                )
 
-                print pooled
-                pooled_outputs_1.append(pooled)
+                pooled_outputs_1.append(h)
 
                 conv = tf.nn.conv2d(
                     self.embedded_chars_a,
                     W,
-                    strides=[1, 1, 1, 1],
-                    padding='VALID',
+                    strides=[1, 1, embedding_size, 1],
+                    padding='SAME',
                     name="conv-2"
                 )
+
                 h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu-2")
-                pooled = tf.nn.max_pool(
-                    h,
-                    ksize=[1, max_input_right - filter_size + 1, 1, 1],
-                    strides=[1, 1, 1, 1],
-                    padding='VALID',
-                    name="poll-2"
-                )
-                pooled_outputs_2.append(pooled)
+                pooled_outputs_2.append(h)
 
                 conv = tf.nn.conv2d(
                     self.embedded_chars_a_neg,
                     W,
-                    strides=[1, 1, 1, 1],
-                    padding='VALID',
+                    strides=[1, 1, embedding_size, 1],
+                    padding='SAME',
                     name="conv-3"
                 )
+
                 h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu-3")
-                pooled = tf.nn.max_pool(
-                    h,
-                    ksize=[1, max_input_right - filter_size + 1, 1, 1],
-                    strides=[1, 1, 1, 1],
-                    padding='VALID',
-                    name="poll-3"
-                )
-                pooled_outputs_3.append(pooled)
+                pooled_outputs_3.append(h)
 
-        num_filters_total = num_filters * len(filter_sizes)
-        pooled_reshape_1 = tf.reshape(tf.concat(3, pooled_outputs_1), [-1, num_filters_total]) 
-        pooled_reshape_2 = tf.reshape(tf.concat(3, pooled_outputs_2), [-1, num_filters_total]) 
-        pooled_reshape_3 = tf.reshape(tf.concat(3, pooled_outputs_3), [-1, num_filters_total])
-        #dropout
-        pooled_flat_1 = tf.nn.dropout(pooled_reshape_1, self.dropout_keep_prob)
-        pooled_flat_2 = tf.nn.dropout(pooled_reshape_2, self.dropout_keep_prob)
-        pooled_flat_3 = tf.nn.dropout(pooled_reshape_3, self.dropout_keep_prob)
 
-        pooled_len_1 = tf.sqrt(tf.reduce_sum(tf.mul(pooled_flat_1, pooled_flat_1), 1)) #计算向量长度Batch模式
-        pooled_len_2 = tf.sqrt(tf.reduce_sum(tf.mul(pooled_flat_2, pooled_flat_2), 1))
-        pooled_len_3 = tf.sqrt(tf.reduce_sum(tf.mul(pooled_flat_3, pooled_flat_3), 1))
-        pooled_mul_12 = tf.reduce_sum(tf.mul(pooled_flat_1, pooled_flat_2), 1) #计算向量的点乘Batch模式
-        pooled_mul_13 = tf.reduce_sum(tf.mul(pooled_flat_1, pooled_flat_3), 1)
+        self.pooled_flat_1 = tf.concat(3, pooled_outputs_1)
+        self.pooled_flat_2 = tf.concat(3, pooled_outputs_2)
+        self.pooled_flat_3 = tf.concat(3, pooled_outputs_3)
         
-        l2_loss = tf.constant(0.0)
-        for p in self.para:
-            l2_loss += tf.nn.l2_loss(p)
-        with tf.name_scope("output"):
-            self.score12 = tf.div(pooled_mul_12, tf.mul(pooled_len_1, pooled_len_2), name="scores") #计算向量夹角Batch模式
-            self.score13 = tf.div(pooled_mul_13, tf.mul(pooled_len_1, pooled_len_3))
-        zero = tf.constant(0, shape=[batch_size], dtype=tf.float32)
-        margin = tf.constant(0.05, shape=[batch_size], dtype=tf.float32)
-        with tf.name_scope("loss"):
-            self.losses = tf.maximum(zero, tf.sub(margin, tf.sub(self.score12, self.score13)))
-            self.loss = tf.reduce_sum(self.losses) + l2_reg_lambda * l2_loss
-            print('loss ', self.loss)
-        # Accuracy
-        with tf.name_scope("accuracy"):
-            self.correct = tf.equal(zero, self.losses)
-        self.accuracy = tf.reduce_mean(tf.cast(self.correct, "float"), name="accuracy")
+        with tf.name_scope('attention'):    
+            self.U = tf.Variable(tf.truncated_normal(shape = [self.batch_size,self.num_filters * len(filter_sizes),\
+                self.num_filters * len(filter_sizes)],stddev = 0.01,name = 'U'))
+            self.para.append(self.U)
+        with tf.name_scope('score'):
+            self.score12 = self.attentive_pooling(self.pooled_flat_1,self.pooled_flat_2)
+            self.score13 = self.attentive_pooling(self.pooled_flat_1,self.pooled_flat_3)
+
+        with tf.name_scope('loss'):
+            self.l2_loss=0
+            for para in self.para:
+                self.l2_loss+= tf.nn.l2_loss(para)
+
+            self.losses = tf.maximum(0.0, tf.sub(0.05, tf.sub(self.score12, self.score13))) 
+            self.loss = tf.reduce_mean(self.losses+self.l2_loss *self.l2_reg_lambda)
+
+            # self.correct = tf.greater(self.score12, self.score13)
+            # self.accuracy = tf.reduce_mean(tf.cast(self.correct, "float"), name="accuracy")
+
+            self.correct = tf.equal(0.0, self.losses)
+            self.accuracy = tf.reduce_mean(tf.cast(self.correct, "float"), name="accuracy")  
+            # self.score13 = self.attentive_pooling(self.pooled_flat_1,self.pooled_flat_3)
+    def attentive_pooling(self,input_left,input_right):
+        Q = tf.reshape(input_left,[self.batch_size,self.max_input_left,len(self.filter_sizes) * self.num_filters],name = 'Q')
+        A = tf.reshape(input_right,[self.batch_size,self.max_input_right,len(self.filter_sizes) * self.num_filters],name = 'A')
+        print Q
+        print A
+        G = tf.tanh(tf.matmul(tf.matmul(Q,self.U),\
+        A,transpose_b = True),name = 'G')
+        # column-wise pooling ,row-wise pooling
+        row_pooling = tf.reduce_max(G,1,True,name = 'row_pooling')
+        col_pooling = tf.reduce_max(G,2,True,name = 'col_pooling')
+
+        attention_q = tf.nn.softmax(col_pooling,1,name = 'attention_q')
+        attention_a = tf.nn.softmax(row_pooling,name = 'attention_a')
+
+        R_q = tf.reshape(tf.matmul(Q,attention_q,transpose_a = 1),[self.batch_size,self.num_filters * len(self.filter_sizes),-1],name = 'R_q')
+        R_a = tf.reshape(tf.matmul(attention_a,A),[self.batch_size,self.num_filters * len(self.filter_sizes),-1],name = 'R_a')
+
+        norm_1 = tf.sqrt(tf.reduce_sum(tf.mul(R_q,R_q),1))
+        norm_2 = tf.sqrt(tf.reduce_sum(tf.mul(R_a,R_a),1))
+        score = tf.div(tf.reduce_sum(tf.mul(R_q,R_a),1),tf.mul(norm_1,norm_2))
+        print G
+        print row_pooling
+        print col_pooling
+        print attention_q
+        print attention_a
+        print R_q
+        print R_a
+        print score
+
+        return score
 
 
+        # print pooled_outputs_1
+        # print pooled_outputs_2
+        # print pooled_outputs_3
 if __name__ == '__main__':
-    cnn = QA_CNN(max_input_left = 33,
+    cnn = QA_attentive(max_input_left = 33,
         max_input_right = 40,
         batch_size = 3,
         vocab_size = 5000,

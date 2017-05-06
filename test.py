@@ -223,13 +223,8 @@ if __name__ == "__main__":
 	# print a[0]
 	# import chardet
 	# print chardet.detect(a[0])
-	a = np.random.rand(3,2)
-	b = np.ones((3,2))
-	print a
-	b[:,0] = 0
-	print b
-
-	print np.sum(a * b)
+	a = 5
+	print type(a)
 	# testReshape()
 	# test_ones()
 	# testConcolution()W
