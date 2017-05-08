@@ -213,7 +213,10 @@ def test_pair_wise(dns = FLAGS.dns):
                 model_type=FLAGS.CNN_type)
 
             # Define Training procedure
-            
+            global_step = tf.Variable(0, name="global_step", trainable = False)
+            optimizer = tf.train.AdamOptimizer(cnn.learning_rate)
+            grads_and_vars = optimizer.compute_gradients(cnn.loss)
+            train_op = optimizer.apply_gradients(grads_and_vars, global_step = global_step)
             saver = tf.train.Saver(tf.global_variables(), max_to_keep=20)
             # Initialize all variables
             sess.run(tf.global_variables_initializer())
@@ -249,7 +252,7 @@ def test_pair_wise(dns = FLAGS.dns):
                         cnn.a_neg_overlap:data[6]
                     }
                     _, step,loss, accuracy,score12,score13 = sess.run(
-                    [cnn.train_op, cnn.global_step,cnn.loss, cnn.accuracy,cnn.score12,cnn.score13],
+                    [train_op, global_step,cnn.loss, cnn.accuracy,cnn.score12,cnn.score13],
                     feed_dict)
                     time_str = datetime.datetime.now().isoformat()
                    
