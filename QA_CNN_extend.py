@@ -4,8 +4,8 @@ import numpy as np
 
 # model_type :apn or qacnn
 class QA_CNN_extend(object):
-    def __init__(self,max_input_left,max_input_right,batch_size,vocab_size,embedding_size,filter_sizes,
-        num_filters,dropout_keep_prob,embeddings = None,l2_reg_lambda = 0.0,is_Embedding_Needed = False,trainable = True,extend_feature_dim = 10,model_type="apn"):
+    def __init__(self,max_input_left,max_input_right,batch_size,vocab_size,embedding_size,filter_sizes,num_filters,
+        dropout_keep_prob=1,learning_rate=0.001,embeddings = None,l2_reg_lambda = 0.0,is_Embedding_Needed = False,trainable = True,extend_feature_dim = 10,model_type="qacnn"):
 
        
 
@@ -22,6 +22,7 @@ class QA_CNN_extend(object):
         self.max_input_right = max_input_right
         self.num_filters_total = self.num_filters * len(self.filter_sizes)
         self.total_embedding_dim=embedding_size + extend_feature_dim
+        self.learning_rate=learning_rate
 
         self.question = tf.placeholder(tf.int32,[None,max_input_left],name = 'input_question')
         self.answer = tf.placeholder(tf.int32,[None,max_input_right],name = 'input_answer')
@@ -88,6 +89,11 @@ class QA_CNN_extend(object):
         with tf.name_scope("accuracy"):
             self.correct = tf.equal(0.0, self.losses)
             self.accuracy = tf.reduce_mean(tf.cast(self.correct, "float"), name="accuracy")
+        self.global_step = tf.Variable(0, name="global_step", trainable = False)
+        optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        grads_and_vars = optimizer.compute_gradients(self.loss)
+        self.train_op = optimizer.apply_gradients(grads_and_vars, global_step = self.global_step)
+        
     def getEmbedding(self,words_indice,overlap_indice):
         embedded_chars_q = tf.nn.embedding_lookup(self.embedding_W,words_indice)
         overlap_embedding_q = tf.nn.embedding_lookup(self.overlap_W,overlap_indice)
@@ -111,7 +117,7 @@ class QA_CNN_extend(object):
 
             pooled = tf.nn.max_pool(
                     h,
-                    ksize=[1, self.max_input_left - filter_size + 1, 1, 1],
+                    ksize=[1, max_length - filter_size + 1, 1, 1],
                     strides=[1, 1, 1, 1],
                     padding='VALID',
                     name="poll-1"
@@ -137,7 +143,8 @@ class QA_CNN_extend(object):
             h = tf.nn.relu(tf.nn.bias_add(conv, self.kernels[i][1]), name="relu-1")
             cnn_outputs.append(h)
             
-            cnn_reshaped = tf.reshape(tf.concat(3, cnn_outputs), [-1, self.num_filters_total]) 
+            # cnn_reshaped = tf.reshape(tf.concat(3, cnn_outputs), [-1, self.num_filters_total]) 
+            cnn_reshaped = tf.concat(3, cnn_outputs)
         return cnn_reshaped
 
     def getCosine(self,q,a ):

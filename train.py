@@ -43,6 +43,7 @@ tf.flags.DEFINE_integer("checkpoint_every", 500, "Save model after this many ste
 tf.flags.DEFINE_boolean('overlap',False,"is overlap used")
 tf.flags.DEFINE_boolean('dns','False','whether use dns or not')
 tf.flags.DEFINE_string('data','wiki','data set')
+tf.flags.DEFINE_string('CNN_type','qacnn','data set')
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
@@ -85,7 +86,7 @@ def test_point_wise():
     print 'train length',len(train)
     print 'test length', len(test)
     print 'dev length', len(dev)
-    print 
+
     alphabet,embeddings = prepare([train,test,dev],is_embedding_needed = True)
     print 'alphabet:',len(alphabet)
     with tf.Graph().as_default():
@@ -207,13 +208,12 @@ def test_pair_wise(dns = FLAGS.dns):
                 embeddings = embeddings,                
                 l2_reg_lambda = FLAGS.l2_reg_lambda,
                 is_Embedding_Needed = True,
-                trainable = FLAGS.trainable)
+                learning_rate=FLAGS.learning_rate,
+                trainable = FLAGS.trainable,
+                model_type=FLAGS.CNN_type)
 
             # Define Training procedure
-            global_step = tf.Variable(0, name="global_step", trainable = False)
-            optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
-            grads_and_vars = optimizer.compute_gradients(cnn.loss)
-            train_op = optimizer.apply_gradients(grads_and_vars, global_step = global_step)
+            
             saver = tf.train.Saver(tf.global_variables(), max_to_keep=20)
             # Initialize all variables
             sess.run(tf.global_variables_initializer())
@@ -249,7 +249,7 @@ def test_pair_wise(dns = FLAGS.dns):
                         cnn.a_neg_overlap:data[6]
                     }
                     _, step,loss, accuracy,score12,score13 = sess.run(
-                    [train_op, global_step,cnn.loss, cnn.accuracy,cnn.score12,cnn.score13],
+                    [cnn.train_op, cnn.global_step,cnn.loss, cnn.accuracy,cnn.score12,cnn.score13],
                     feed_dict)
                     time_str = datetime.datetime.now().isoformat()
                    
