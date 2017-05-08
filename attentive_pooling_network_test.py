@@ -108,8 +108,7 @@ class QA_attentive(object):
     def attentive_pooling(self,input_left,input_right):
         Q = tf.reshape(input_left,[self.batch_size,self.max_input_left,len(self.filter_sizes) * self.num_filters],name = 'Q')
         A = tf.reshape(input_right,[self.batch_size,self.max_input_right,len(self.filter_sizes) * self.num_filters],name = 'A')
-        print Q
-        print A
+
         G = tf.tanh(tf.matmul(tf.matmul(Q,self.U),\
         A,transpose_b = True),name = 'G')
         # column-wise pooling ,row-wise pooling
@@ -125,13 +124,6 @@ class QA_attentive(object):
         norm_1 = tf.sqrt(tf.reduce_sum(tf.mul(R_q,R_q),1))
         norm_2 = tf.sqrt(tf.reduce_sum(tf.mul(R_a,R_a),1))
         score = tf.div(tf.reduce_sum(tf.mul(R_q,R_a),1),tf.mul(norm_1,norm_2))
-        print G
-        print row_pooling
-        print col_pooling
-        print attention_q
-        print attention_a
-        print R_q
-        print R_a
         print score
 
         return score

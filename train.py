@@ -85,6 +85,7 @@ def test_point_wise():
     print 'train length',len(train)
     print 'test length', len(test)
     print 'dev length', len(dev)
+    print 
     alphabet,embeddings = prepare([train,test,dev],is_embedding_needed = True)
     print 'alphabet:',len(alphabet)
     with tf.Graph().as_default():
@@ -458,6 +459,6 @@ def test_quora(dns = False):
 
 if __name__ == '__main__':
     # test_quora()
+    # test_pair_wise()
     test_pair_wise()
-    # test_dns()
     # test_point_wise()
