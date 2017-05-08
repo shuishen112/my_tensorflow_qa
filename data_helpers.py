@@ -163,6 +163,21 @@ def batch_gen_with_single(df,alphabet,batch_size = 10,q_len = 33,a_len = 40):
         yield [[pair[j] for pair in batch]  for j in range(4)]
     batch= pairs[n_batches*batch_size:] + [pairs[n_batches*batch_size]] * (batch_size- len(pairs)+n_batches*batch_size  )
     yield [[pair[i] for pair in batch]  for i in range(4)]
+def batch_gen_with_single_attentive(df,alphabet,batch_size = 10,q_len = 33,a_len = 40):
+    pairs=[]
+    for index,row in df.iterrows():
+        quetion = encode_to_split(row["question"],alphabet,max_sentence = q_len)
+        answer = encode_to_split(row["answer"],alphabet,max_sentence = a_len)
+        pairs.append((quetion,answer))
+    # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
+    n_batches = int(len(pairs)*1.0/batch_size)
+    # pairs = sklearn.utils.shuffle(pairs,random_state =132)
+    for i in range(0,n_batches):
+        batch = pairs[i*batch_size:(i+1) * batch_size]
+
+        yield [[pair[j] for pair in batch]  for j in range(2)]
+    batch= pairs[n_batches*batch_size:] + [pairs[n_batches*batch_size]] * (batch_size- len(pairs)+n_batches*batch_size  )
+    yield [[pair[i] for pair in batch]  for i in range(4)]
 # this is for trec,wiki data
 def parseData(df,alphabet,q_len = 33,a_len = 40):
     q = []
@@ -224,7 +239,7 @@ def batch_gen_with_pair(df,alphabet, batch_size=10,q_len = 40,a_len = 40):
 
     for i in range(0,n_batches):
         batch = pairs[i*batch_size:(i+1) * batch_size]
-        yield ([pair[i] for pair in batch]  for i in range(3))
+        yield [[pair[i] for pair in batch]  for i in range(3)]
 def overlap_index(question,answer,q_len,a_len,stopwords = []):
     qset = set(cut(question))
     aset = set(cut(answer))

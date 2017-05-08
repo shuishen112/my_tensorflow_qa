@@ -21,7 +21,7 @@ class QA_CNN_extend(object):
         self.max_input_left = max_input_left
         self.max_input_right = max_input_right
         self.num_filters_total = self.num_filters * len(self.filter_sizes)
-        self.total_embedding_dim=embedding_size + extend_feature_dim
+        self.total_embedding_dim = embedding_size + extend_feature_dim
         self.learning_rate=learning_rate
 
         self.question = tf.placeholder(tf.int32,[None,max_input_left],name = 'input_question')
