@@ -177,7 +177,7 @@ def batch_gen_with_single_attentive(df,alphabet,batch_size = 10,q_len = 33,a_len
 
         yield [[pair[j] for pair in batch]  for j in range(2)]
     batch= pairs[n_batches*batch_size:] + [pairs[n_batches*batch_size]] * (batch_size- len(pairs)+n_batches*batch_size  )
-    yield [[pair[i] for pair in batch]  for i in range(4)]
+    yield [[pair[i] for pair in batch]  for i in range(2)]
 # this is for trec,wiki data
 def parseData(df,alphabet,q_len = 33,a_len = 40):
     q = []

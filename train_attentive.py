@@ -3,7 +3,7 @@ import numpy as np
 import os
 import time
 import datetime
-from data_helpers import batch_gen_with_pair_overlap,batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,parseData,batch_gen_with_pair_whole
+from data_helpers import batch_gen_with_single_attentive,batch_gen_with_pair_overlap,batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,parseData,batch_gen_with_pair_whole
 import operator
 from QA import QA
 from QA_CNN import QA_CNN
