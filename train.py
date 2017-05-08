@@ -5,10 +5,11 @@ import numpy as np
 import os
 import time
 import datetime
-from data_helpers import batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,parseData,batch_gen_with_pair_whole
+from data_helpers import batch_gen_with_pair_overlap,batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,parseData,batch_gen_with_pair_whole
 import operator
 from QA import QA
 from QA_CNN import QA_CNN
+from QA_CNN_extend import QA_CNN_extend
 from attentive_pooling_network_test import QA_attentive
 import random
 import evaluation
@@ -57,22 +58,14 @@ data_file = log_dir + '/test_' + FLAGS.data + timeStamp
 precision = data_file + 'precise'
 def predict(sess,cnn,test,alphabet,batch_size,q_len,a_len):
     scores=[]
-    for x_left_batch, x_right_batch in batch_gen_with_single(test,alphabet,batch_size,q_len,a_len):       
-        
-        if FLAGS.loss == 'point_wise':
-            feed_dict = {
-                        cnn.question: x_left_batch,
-                        cnn.answer: x_right_batch,
-                    }
-            score = sess.run(cnn.scores, feed_dict)
-            print 'predict {} sample'.format(len(score))
-        else:
-            feed_dict = {
-                        cnn.question: x_left_batch,
-                        cnn.answer: x_right_batch,
-                        cnn.answer_negative: x_right_batch
-                    }
-            score = sess.run(cnn.score13, feed_dict)
+    for data in batch_gen_with_single(test,alphabet,batch_size,q_len,a_len):       
+        feed_dict = {
+                    cnn.question: data[0],
+                    cnn.answer: data[1],
+                    cnn.q_pos_overlap: data[2],
+                    cnn.a_pos_overlap: data[3]
+                }
+        score = sess.run(cnn.score12, feed_dict)
         scores.extend(score)
     return np.array(scores[:len(test)])
 def prediction(sess,cnn,test,alphabet,q_len,a_len):
@@ -201,7 +194,7 @@ def test_pair_wise(dns = FLAGS.dns):
             log.write(str(FLAGS.__flags) + '\n')
             # train,test,dev = load("trec",filter=True)
             # alphabet,embeddings = prepare([train,test,dev],is_embedding_needed = True)
-            cnn = QA_attentive(
+            cnn = QA_CNN_extend(
                 max_input_left = q_max_sent_length,
                 max_input_right = a_max_sent_length,
                 batch_size = FLAGS.batch_size,
@@ -241,14 +234,18 @@ def test_pair_wise(dns = FLAGS.dns):
                         a_max_sent_length,sess,cnn,FLAGS.batch_size,neg_sample_num = 10)
                     datas = batch_gen_with_pair_dns(samples,FLAGS.batch_size)
                 else:
-                    datas = batch_gen_with_pair(train,alphabet,FLAGS.batch_size,
+                    datas = batch_gen_with_pair_overlap(train,alphabet,FLAGS.batch_size,
                         q_len = q_max_sent_length,a_len = a_max_sent_length)        
                 
-                for x_batch_1, x_batch_2, x_batch_3 in datas:
+                for data in datas:
                     feed_dict = {
-                        cnn.question: x_batch_1,
-                        cnn.answer: x_batch_2,
-                        cnn.answer_negative:x_batch_3
+                        cnn.question: data[0],
+                        cnn.answer: data[1],
+                        cnn.answer_negative:data[2],
+                        cnn.q_pos_overlap:data[3],
+                        cnn.q_neg_overlap:data[4],
+                        cnn.a_pos_overlap:data[5],
+                        cnn.a_neg_overlap:data[6]
                     }
                     _, step,loss, accuracy,score12,score13 = sess.run(
                     [train_op, global_step,cnn.loss, cnn.accuracy,cnn.score12,cnn.score13],
@@ -271,7 +268,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 print "{}:epoch:train map mrr {}".format(i,map_mrr_train)
                 print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
                 # print "{}:epoch:map mrr {}".format(i,map_mrr_dev)
-                line = " {}:epoch: map_mrr_train{}----map_mrr_test{}".format(i,map_mrr_train,map_mrr_test)
+                line = " {}:epoch: map_train{}----map_test{}".format(i,map_mrr_train[0],map_mrr_test[0])
                 log.write(line + '\n')
                 log.flush()
                 if map_mrr_test[0] > map_max:

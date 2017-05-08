@@ -49,6 +49,25 @@ def idf_word_overlap(row):
 	# print idf_overlap,len(overlap)
 	idf_overlap = (idf_overlap + 1.0) / (len(overlap)+1.0)
 	return idf_overlap
+def overlap_index(question,answer,q_len,a_len,stopwords = []):
+	qset = set([q for q in question if q not in stopwords])
+	aset = set([a for a in answer if a not in stopwords])
+
+	q_index = np.ones(q_len)
+	a_index = np.ones(a_len)
+
+	overlap = qset.intersection(aset)
+	for i,q in enumerate(question):
+		value = 0
+		if q in overlap:
+			value = 1
+		q_index[i] = value
+	for i,a in enumerate(answer):
+		value = 0
+		if a in overlap:
+			value = 1
+		a_index[i] = value
+	return q_index,a_index
 def idf_overlap(row,stopwords = []):
 	question = row["question"].split()
 	answer = row["answer"].split()

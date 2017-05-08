@@ -10,7 +10,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import seaborn as sns
 import evaluation
-from features import overlap_jiabing
+from features import overlap_jiabing,overlap_index
 import string
 from nltk import stem
 import chardet
@@ -152,16 +152,17 @@ def batch_gen_with_single(df,alphabet,batch_size = 10,q_len = 33,a_len = 40):
     for index,row in df.iterrows():
         quetion = encode_to_split(row["question"],alphabet,max_sentence = q_len)
         answer = encode_to_split(row["answer"],alphabet,max_sentence = a_len)
-        pairs.append((quetion,answer))
+        q_pos_overlap,a_pos_overlap=overlap_index(row["question"],row["answer"],q_len,a_len)
+        pairs.append((quetion,answer,q_pos_overlap,a_pos_overlap))
     # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
     n_batches = int(len(pairs)*1.0/batch_size)
     # pairs = sklearn.utils.shuffle(pairs,random_state =132)
     for i in range(0,n_batches):
         batch = pairs[i*batch_size:(i+1) * batch_size]
 
-        yield ([pair[j] for pair in batch]  for j in range(2))
+        yield [[pair[j] for pair in batch]  for j in range(4)]
     batch= pairs[n_batches*batch_size:] + [pairs[n_batches*batch_size]] * (batch_size- len(pairs)+n_batches*batch_size  )
-    yield ([pair[i] for pair in batch]  for i in range(2))
+    yield [[pair[i] for pair in batch]  for i in range(4)]
 # this is for trec,wiki data
 def parseData(df,alphabet,q_len = 33,a_len = 40):
     q = []
@@ -224,7 +225,81 @@ def batch_gen_with_pair(df,alphabet, batch_size=10,q_len = 40,a_len = 40):
     for i in range(0,n_batches):
         batch = pairs[i*batch_size:(i+1) * batch_size]
         yield ([pair[i] for pair in batch]  for i in range(3))
+def overlap_index(question,answer,q_len,a_len,stopwords = []):
+    qset = set(cut(question))
+    aset = set(cut(answer))
 
+    q_index = np.zeros(q_len)
+    a_index = np.zeros(a_len)
+
+    overlap = qset.intersection(aset)
+    for i,q in enumerate(cut(question)):
+        value = 1
+        if q in overlap:
+            value = 2
+        q_index[i] = value
+    for i,a in enumerate(cut(answer)):
+        value = 1
+        if a in overlap:
+            value = 2
+        a_index[i] = value
+    return q_index,a_index
+
+def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 40):
+    pairs=[]
+    for question in df["question"].unique():
+        group= df[df["question"]==question]
+        pos_answers = group[df["flag"]==1]["answer"]
+        neg_answers = group[df["flag"]==0]["answer"].reset_index()
+        question_indices = encode_to_split(question,alphabet,max_sentence = q_len)
+        for pos in pos_answers:
+            if len(neg_answers.index)>0:
+                neg_index=np.random.choice(neg_answers.index)
+
+                neg= neg_answers.loc[neg_index,]["answer"]
+                q_pos_overlap,a_pos_overlap=overlap_index(question,pos,q_len,a_len)
+                
+                q_neg_overlap,a_neg_overlap=overlap_index(question,neg,q_len,a_len)
+                pairs.append((question_indices,encode_to_split(pos,alphabet,max_sentence = a_len),encode_to_split(neg,alphabet,max_sentence = a_len),q_pos_overlap,q_neg_overlap,a_pos_overlap,a_neg_overlap))
+    print 'pairs:{}'.format(len(pairs))
+    # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
+    n_batches= int(len(pairs)*1.0/batch_size)
+    pairs = sklearn.utils.shuffle(pairs,random_state =132)
+
+    for i in range(0,n_batches):
+        batch = pairs[i*batch_size:(i+1) * batch_size]
+        yield [[pair[i] for pair in batch]  for i in range(7)]
+def get_raw_pairs(df):
+    pairs = []
+    for question in df['question'].unique():
+        group = df[df['question'] == question]
+        pos_answers = group[df['flag'] == 1]['answer']
+        neg_answers = group[df['flag'] == 0]['answer'].reset_index()
+        for pos in pos_answers:
+            if len(neg_answers.index) > 0:
+                neg_index = np.random.choice(neg_answers.index)
+                neg = neg_answers.loc[neg_index]['answer']
+                pairs.append((question,pos,neg))
+    return pairs
+def batch_gen_with_overlap(df,alphabet,batch_size = 10,qlen = 40,a_len = 40):
+    pairs = get_raw_pairs(df)
+    overlap = []
+    for question,pos,neg in pairs:
+        q_pos_overlap_index,a_pos_overlap_index = overlap_index(question,pos,q_len,a_len)
+        q_neg_overlap_index,a_neg_overlap_index = overlap_index(question,neg,q_len,a_len)
+def batch_gen_with_pare_output_feature(df,alphabet,batch_size = 10,q_len = 40,a_len = 40):
+    pairs = get_raw_pairs(df)
+
+    overlap = []
+    for question,pos,neg in pairs:
+        q_pos_overlap_index,a_pos_overlap_index = overlap_index(question,pos,q_len,a_len)
+        q_neg_overlap_index,a_neg_overlap_index = overlap_index(question,neg,q_len,a_len)    # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
+    n_batches= int(len(pairs)*1.0/batch_size)
+    pairs = sklearn.utils.shuffle(pairs,random_state =132)
+
+    for i in range(0,n_batches):
+        batch = pairs[i*batch_size:(i+1) * batch_size]
+        yield ([pair[i] for pair in batch]  for i in range(3))
 def batch_gen_with_pair_whole(df,alphabet, batch_size = 10,q_len = 40,a_len = 40):
     pairs=[]
     for question in df["question"].unique():
@@ -358,7 +433,16 @@ def prepare_300(cropuses):
     sub_dict_embedding = load_bin_vec(alphabet)
     sub_embeddings = getSubVectorsFromDict(sub_dict_embedding,alphabet)
     return alphabet,sub_embeddings
-def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
+def cut(sentence,isEnglish = True):
+    if isEnglish:
+        tokens = sentence.lower().split()
+    else:
+        stopwords = { word.decode("utf-8") for word in open("model/chStopWordsSimple.txt").read().split()}
+
+        words = jieba.cut(str(sentence))
+        tokens = [word for word in words if word not in stopwords]
+    return tokens
+def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False,isEnglish = True):
     alphabet = Alphabet(start_feature_id=0)
     alphabet.add('UNKNOWN_WORD_IDX_0')  
     alphabet.add('END') 
@@ -366,7 +450,7 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
     for corpus in cropuses:
         for texts in [corpus["question"],corpus["answer"]]:
             for sentence in texts:   
-                tokens = sentence.lower().split()
+                tokens = cut(sentence)
                 for token in tokens:
                     if is_stemmed_needed:
                         # try:
@@ -382,15 +466,20 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
         sub_vec_file = 'embedding/sub_vector'
         if os.path.exists(sub_vec_file) and not fresh:
             sub_embeddings = pickle.load(open(sub_vec_file,'r'))
-        else:            
-            if dim == 50:
-                fname = "embedding/aquaint+wiki.txt.gz.ndim=50.bin"
-                embeddings = KeyedVectors.load_word2vec_format(fname, binary=True)
-                sub_embeddings = getSubVectors(embeddings,alphabet)
+        else:    
+            if isEnglish:        
+                if dim == 50:
+                    fname = "embedding/aquaint+wiki.txt.gz.ndim=50.bin"
+                    embeddings = KeyedVectors.load_word2vec_format(fname, binary=True)
+                    sub_embeddings = getSubVectors(embeddings,alphabet)
+                else:
+                    fname = 'embedding/glove.6B/glove.6B.300d.txt'
+                    embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
+                    sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             else:
-                fname = 'embedding/glove.6B/glove.6B.300d.txt'
-                embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
-                sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
+                fname = 'model/dbqa.word2vec'
+                embeddings = load_text_vec(alphabet,fname)
+                sub_embeddings = getSubVectorsFromDict(embeddings,alphabet)
             pickle.dump(sub_embeddings,open(sub_vec_file,'w'))
         # print (len(alphabet.keys()))
         # embeddings = load_vectors(vectors,alphabet.keys(),layer1_size)
@@ -746,7 +835,7 @@ def batch_gen_with_pair_dns(samples,batch_size,epoches=1):
             batch = pairs[i*batch_size:(i+1) * batch_size]
             yield ([pair[i] for pair in batch]  for i in range(3))           
 if __name__ == '__main__':
-    train,test,dev = load("wiki",filter = True)
+    train,test,dev = load("nlpcc",filter = True)
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
     a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
