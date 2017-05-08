@@ -184,7 +184,7 @@ def test_pair_wise(dns = FLAGS.dns):
     # alphabet,embeddings = prepare_300([train,test,dev])
     print 'alphabet:',len(alphabet)
 
-    with tf.Graph().as_default():
+    with tf.Graph().as_default(), tf.device("/gpu:0"):
         # with tf.device("/cpu:0"):
         session_conf = tf.ConfigProto(
             allow_soft_placement = FLAGS.allow_soft_placement,
