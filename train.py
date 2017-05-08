@@ -458,6 +458,6 @@ def test_quora(dns = False):
 
 if __name__ == '__main__':
     # test_quora()
-    test_pair_dwise()
+    test_pair_wise()
     # test_dns()
     # test_point_wise()
