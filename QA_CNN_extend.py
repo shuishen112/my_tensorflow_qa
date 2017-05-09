@@ -5,7 +5,7 @@ import numpy as np
 # model_type :apn or qacnn
 class QA_CNN_extend(object):
     def __init__(self,max_input_left,max_input_right,batch_size,vocab_size,embedding_size,filter_sizes,num_filters,
-        dropout_keep_prob=1,learning_rate=0.001,embeddings = None,l2_reg_lambda = 0.0,is_Embedding_Needed = False,trainable = True,extend_feature_dim = 10,model_type="qacnn"):
+        dropout_keep_prob=1,learning_rate=0.001,embeddings = None,l2_reg_lambda = 0.0,overlap_needed = False,trainable = True,extend_feature_dim = 10,model_type="qacnn"):
 
        
 
@@ -20,8 +20,12 @@ class QA_CNN_extend(object):
         self.extend_feature_dim = extend_feature_dim
         self.max_input_left = max_input_left
         self.max_input_right = max_input_right
+        self.overlap_needed=overlap_needed
         self.num_filters_total = self.num_filters * len(self.filter_sizes)
-        self.total_embedding_dim = embedding_size + extend_feature_dim
+        if self.overlap_needed:
+            self.total_embedding_dim = embedding_size + extend_feature_dim
+        else:
+            self.total_embedding_dim=embedding_size
         self.learning_rate=learning_rate
 
         self.question = tf.placeholder(tf.int32,[None,max_input_left],name = 'input_question')
@@ -32,11 +36,12 @@ class QA_CNN_extend(object):
         self.a_pos_overlap = tf.placeholder(tf.int32,[None,max_input_right],name = 'a_feature_embed')
         self.a_neg_overlap = tf.placeholder(tf.int32,[None,max_input_right],name = 'a_neg_feature_embed')
         with tf.name_scope('embedding'):
-            if is_Embedding_Needed:
+            if embeddings !=None:
                 print "load embedding"
                 W = tf.Variable(np.array(self.embeddings),name="W" ,dtype="float32",trainable = trainable)
                 
             else:
+                print "random embedding"
                 W = tf.Variable(tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),name="W",trainable = trainable)
             self.embedding_W = W
             self.overlap_W = tf.Variable(tf.random_uniform([3, self.extend_feature_dim], -1.0, 1.0),name="W",trainable = trainable)
@@ -96,6 +101,8 @@ class QA_CNN_extend(object):
         
     def getEmbedding(self,words_indice,overlap_indice):
         embedded_chars_q = tf.nn.embedding_lookup(self.embedding_W,words_indice)
+        if not self.overlap_needed:
+            return  tf.expand_dims(embedded_chars_q,-1)
         overlap_embedding_q = tf.nn.embedding_lookup(self.overlap_W,overlap_indice)
         return  tf.expand_dims(tf.concat(2,[embedded_chars_q,overlap_embedding_q]),-1)
 
@@ -191,7 +198,7 @@ if __name__ == '__main__':
         dropout_keep_prob = 1.0,
         embeddings = None,
         l2_reg_lambda=0.0,
-        is_Embedding_Needed = False,
+        overlap_needed = False,
         trainable = True,
         extend_feature_dim = 10)
     input_x_1 = np.reshape(np.arange(3 * 33),[3,33])

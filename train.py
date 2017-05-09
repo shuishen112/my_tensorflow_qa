@@ -23,6 +23,20 @@ timeStamp = time.strftime("%Y%m%d%H%M%S", timeArray)
 timeDay = time.strftime("%Y%m%d", timeArray)
 print (timeStamp)
 
+from functools import wraps
+#print( tf.__version__)
+def log_time_delta(func):
+    @wraps(func)
+    def _deco(*args, **kwargs):
+        start = time.time()
+        ret = func(*args, **kwargs)
+        end = time.time()
+        delta = end - start
+        print( "%s runed %.2f seconds"% (func.__name__,delta))
+        return ret
+    return _deco
+
+
 
 # Model Hyperparameters
 tf.flags.DEFINE_integer("embedding_dim",300, "Dimensionality of character embedding (default: 128)")
@@ -40,7 +54,7 @@ tf.flags.DEFINE_boolean("trainable", True, "is embedding trainable? (default: Fa
 tf.flags.DEFINE_integer("num_epochs", 500, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("evaluate_every", 500, "Evaluate model on dev set after this many steps (default: 100)")
 tf.flags.DEFINE_integer("checkpoint_every", 500, "Save model after this many steps (default: 100)")
-tf.flags.DEFINE_boolean('overlap',False,"is overlap used")
+tf.flags.DEFINE_boolean('overlap_needed',False,"is overlap used")
 tf.flags.DEFINE_boolean('dns','False','whether use dns or not')
 tf.flags.DEFINE_string('data','wiki','data set')
 tf.flags.DEFINE_string('CNN_type','apn','data set')
@@ -57,6 +71,8 @@ if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 data_file = log_dir + '/test_' + FLAGS.data + timeStamp
 precision = data_file + 'precise'
+
+@log_time_delta
 def predict(sess,cnn,test,alphabet,batch_size,q_len,a_len):
     scores=[]
     for data in batch_gen_with_single(test,alphabet,batch_size,q_len,a_len):       
@@ -69,6 +85,8 @@ def predict(sess,cnn,test,alphabet,batch_size,q_len,a_len):
         score = sess.run(cnn.score12, feed_dict)
         scores.extend(score)
     return np.array(scores[:len(test)])
+
+@log_time_delta
 def prediction(sess,cnn,test,alphabet,q_len,a_len):
     question,answer,overlap = parseData(test,alphabet,q_len,a_len)
     feed_dict = {
@@ -78,6 +96,8 @@ def prediction(sess,cnn,test,alphabet,q_len,a_len):
     }
     score = sess.run(cnn.scores,feed_dict)
     return score
+
+@log_time_delta
 def test_point_wise():
     train,test,dev = load("wiki",filter = True)
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
@@ -173,6 +193,8 @@ def test_point_wise():
                 log.write(line + '\n')
                 log.flush()
             log.close()
+
+@log_time_delta
 def test_pair_wise(dns = FLAGS.dns):
     train,test,dev = load(FLAGS.data,filter = True)
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
@@ -196,6 +218,7 @@ def test_pair_wise(dns = FLAGS.dns):
             log.write(str(FLAGS.__flags) + '\n')
             # train,test,dev = load("trec",filter=True)
             # alphabet,embeddings = prepare([train,test,dev],is_embedding_needed = True)
+            print "start build model"
             cnn = QA_CNN_extend(
                 max_input_left = q_max_sent_length,
                 max_input_right = a_max_sent_length,
@@ -207,7 +230,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 dropout_keep_prob = FLAGS.dropout_keep_prob,
                 embeddings = embeddings,                
                 l2_reg_lambda = FLAGS.l2_reg_lambda,
-                is_Embedding_Needed = True,
+                overlap_needed = FLAGS.overlap_needed,
                 learning_rate=FLAGS.learning_rate,
                 trainable = FLAGS.trainable,
                 model_type=FLAGS.CNN_type)
@@ -219,7 +242,9 @@ def test_pair_wise(dns = FLAGS.dns):
             train_op = optimizer.apply_gradients(grads_and_vars, global_step = global_step)
             saver = tf.train.Saver(tf.global_variables(), max_to_keep=20)
             # Initialize all variables
+            print "build over"
             sess.run(tf.global_variables_initializer())
+            print "variables_initializer"
             if dns == True:
                 loadfile="tmp/20170502223124__0.678083232207.ckpt"
                 saver.restore(sess, loadfile)
@@ -240,7 +265,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 else:
                     datas = batch_gen_with_pair_overlap(train,alphabet,FLAGS.batch_size,
                         q_len = q_max_sent_length,a_len = a_max_sent_length)        
-                
+                print "load data"
                 for data in datas:
                     feed_dict = {
                         cnn.question: data[0],

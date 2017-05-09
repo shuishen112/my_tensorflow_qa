@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 class QA_attentive(object):
     def __init__(self,max_input_left,max_input_right,batch_size,vocab_size,embedding_size,filter_sizes,
-        num_filters,dropout_keep_prob,embeddings = None,l2_reg_lambda = 0.0,learning_rate = 0.001,is_Embedding_Needed = False,trainable = True,extend_feature_dim = 10,model_type = 'qacnn'):
+        num_filters,dropout_keep_prob,embeddings = None,l2_reg_lambda = 0.0,is_Embedding_Needed = False,trainable = True):
 
         self.question = tf.placeholder(tf.int32,[None,max_input_left],name = 'input_question')
         self.answer = tf.placeholder(tf.int32,[None,max_input_right],name = 'input_answer')
@@ -12,17 +12,12 @@ class QA_attentive(object):
         self.max_input_left = max_input_left
         self.max_input_right = max_input_right
         self.embeddings = embeddings
-        self.extend_feature_dim = extend_feature_dim
-        self.total_embedding_size = embedding_size + extend_feature_dim 
+        self.embedding_size = embedding_size
         self.filter_sizes = filter_sizes
-        self.learning_rate = learning_rate
         self.batch_size = batch_size
         self.l2_reg_lambda = l2_reg_lambda
+        self.l2_reg_lambda_keep_prob = tf.placeholder(tf.float32, name = "dropout_keep_prob")
         self.para = []
-        self.q_pos_overlap = tf.placeholder(tf.int32,[None,max_input_left],name = 'q_pos_feature_embed')
-        self.q_neg_overlap = tf.placeholder(tf.int32,[None,max_input_left],name = 'q_neg_feature_embed')
-        self.a_pos_overlap = tf.placeholder(tf.int32,[None,max_input_right],name = 'a_feature_embed')
-        self.a_neg_overlap = tf.placeholder(tf.int32,[None,max_input_right],name = 'a_neg_feature_embed')
         with tf.name_scope('embedding'):
             if is_Embedding_Needed:
                 print "load embedding"
@@ -30,40 +25,12 @@ class QA_attentive(object):
             else:
                 W = tf.Variable(tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),name="W",trainable = trainable)
             self.embedding_W = W
-            self.overlap_W = tf.Variable(tf.random_uniform([3, self.extend_feature_dim], -1.0, 1.0),name="W",trainable = trainable)
             self.para.append(self.embedding_W)
-            self.para.append(self.overlap_W)
-        self.kernels = []
-        for i,filter_size in enumerate(filter_sizes):
-            with tf.name_scope('conv-max-pool-%s' % filter_size):
-                filter_shape = [filter_size,self.total_embedding_size,1,num_filters]
-                W = tf.Variable(tf.truncated_normal(filter_shape, stddev = 0.1), name="W")
-                b = tf.Variable(tf.constant(0.0, shape=[num_filters]), name="b")
-                self.kernels.append((W,b))
-                self.para.append(W)
-                self.para.append(b)
-        with tf.name_scope('concat_embeddings'):
-            q_pos_embedding = self.getEmbedding(self.question,self.q_pos_overlap)
-            q_neg_embedding = self.getEmbedding(self.question,self.q_neg_overlap)
-            a_pos_embedding = self.getEmbedding(self.answer, self.a_pos_overlap)
-            a_neg_embedding = self.getEmbedding(self.answer_negative,self.a_neg_overlap)
-        with tf.name_scope('feature_map'):
-            q_pos_f = self.get_feature_map(q_pos_embedding)
-            q_neg_f = self.get_feature_map(q_neg_embedding)
-            a_pos_f = self.get_feature_map(a_pos_embedding)
-            a_neg_f = self.get_feature_map(a_neg_embedding)
-        with tf.name_scope('attention'):    
-            self.U = tf.Variable(tf.truncated_normal(shape = [self.batch_size,self.num_filters * len(filter_sizes),\
-                self.num_filters * len(filter_sizes)],stddev = 0.01,name = 'U'))
-            self.para.append(self.U)
-        with tf.name_scope('score'):
-            self.score12 = self.attentive_pooling(q_pos_f,a_pos_f)
-            self.score13 = self.attentive_pooling(q_neg_f,a_neg_f)
-        #     self.embedded_chars_q = tf.expand_dims(tf.nn.embedding_lookup(W,self.question),-1)
-        #     self.embedded_chars_a = tf.expand_dims(tf.nn.embedding_lookup(W,self.answer),-1)
-        #     self.embedded_chars_a_neg = tf.expand_dims(tf.nn.embedding_lookup(W,self.answer_negative),-1)
-    
-        '''
+            self.embedded_chars_q = tf.expand_dims(tf.nn.embedding_lookup(W,self.question),-1)
+            self.embedded_chars_a = tf.expand_dims(tf.nn.embedding_lookup(W,self.answer),-1)
+            self.embedded_chars_a_neg = tf.expand_dims(tf.nn.embedding_lookup(W,self.answer_negative),-1)
+        print self.embedded_chars_q
+        print self.embedded_chars_a
         pooled_outputs_1 = []
         pooled_outputs_2 = []
         pooled_outputs_3 = []
@@ -115,11 +82,14 @@ class QA_attentive(object):
         self.pooled_flat_1 = tf.concat(3, pooled_outputs_1)
         self.pooled_flat_2 = tf.concat(3, pooled_outputs_2)
         self.pooled_flat_3 = tf.concat(3, pooled_outputs_3)
-        '''
-
-        # with tf.name_scope('score'):
-        #     self.score12 = self.attentive_pooling(self.pooled_flat_1,self.pooled_flat_2)
-        #     self.score13 = self.attentive_pooling(self.pooled_flat_1,self.pooled_flat_3)
+        
+        with tf.name_scope('attention'):    
+            self.U = tf.Variable(tf.truncated_normal(shape = [self.batch_size,self.num_filters * len(filter_sizes),\
+                self.num_filters * len(filter_sizes)],stddev = 0.01,name = 'U'))
+            self.para.append(self.U)
+        with tf.name_scope('score'):
+            self.score12 = self.attentive_pooling(self.pooled_flat_1,self.pooled_flat_2)
+            self.score13 = self.attentive_pooling(self.pooled_flat_1,self.pooled_flat_3)
 
         with tf.name_scope('loss'):
             self.l2_loss=0
@@ -134,28 +104,6 @@ class QA_attentive(object):
 
             self.correct = tf.equal(0.0, self.losses)
             self.accuracy = tf.reduce_mean(tf.cast(self.correct, "float"), name="accuracy")  
-    def get_feature_map(self,sentence_indice):
-        pooled_outputs = []
-        for i, filter_size in enumerate(self.filter_sizes):
-            with tf.name_scope("conv-%s" % filter_size):
-               
-                conv = tf.nn.conv2d(
-                    sentence_indice,
-                    self.kernels[i][0],
-                    strides=[1, 1, self.total_embedding_size, 1],
-                    padding='SAME',
-                    name="conv-1"
-                )
-                print conv
-                h = tf.nn.relu(tf.nn.bias_add(conv, self.kernels[i][1]), name="relu-1")
-
-                pooled_outputs.append(h)
-        self.pooled_flat = tf.concat(3, pooled_outputs)
-        return self.pooled_flat
-    def getEmbedding(self,words_indice,overlap_indice):
-        embedded_chars_q = tf.nn.embedding_lookup(self.embedding_W,words_indice)
-        overlap_embedding_q = tf.nn.embedding_lookup(self.overlap_W,overlap_indice)
-        return  tf.expand_dims(tf.concat(2,[embedded_chars_q,overlap_embedding_q]),-1)
             # self.score13 = self.attentive_pooling(self.pooled_flat_1,self.pooled_flat_3)
     def attentive_pooling(self,input_left,input_right):
         Q = tf.reshape(input_left,[self.batch_size,self.max_input_left,len(self.filter_sizes) * self.num_filters],name = 'Q')
@@ -185,7 +133,7 @@ class QA_attentive(object):
         # print pooled_outputs_2
         # print pooled_outputs_3
 if __name__ == '__main__':
-     cnn = QA_attentive(max_input_left = 33,
+    cnn = QA_attentive(max_input_left = 33,
         max_input_right = 40,
         batch_size = 3,
         vocab_size = 5000,
@@ -196,5 +144,13 @@ if __name__ == '__main__':
         embeddings = None,
         l2_reg_lambda=0.0,
         is_Embedding_Needed = False,
-        trainable = True,
-        extend_feature_dim = 10)
+        trainable = True)
+    input_x_1 = np.reshape(np.arange(3 * 33),[3,33])
+    input_x_2 = np.reshape(np.arange(3 * 40),[3,40])
+    input_x_3 = np.reshape(np.arange(3 * 40),[3,40])
+
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        question,answer = sess.run([cnn.embedded_chars_q,cnn.embedded_chars_a],feed_dict = {cnn.question:input_x_1,cnn.answer:input_x_2,
+            cnn.answer_negative:input_x_3})
+print question.shape,answer.shape
