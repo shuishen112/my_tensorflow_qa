@@ -25,7 +25,7 @@ class QA_CNN_extend(object):
         if self.overlap_needed:
             self.total_embedding_dim = embedding_size + extend_feature_dim
         else:
-            self.total_embedding_dim=embedding_size
+            self.total_embedding_dim = embedding_size
         self.learning_rate=learning_rate
 
         self.question = tf.placeholder(tf.int32,[None,max_input_left],name = 'input_question')
@@ -36,7 +36,7 @@ class QA_CNN_extend(object):
         self.a_pos_overlap = tf.placeholder(tf.int32,[None,max_input_right],name = 'a_feature_embed')
         self.a_neg_overlap = tf.placeholder(tf.int32,[None,max_input_right],name = 'a_neg_feature_embed')
         with tf.name_scope('embedding'):
-            if embeddings !=None:
+            if embeddings != None:
                 print "load embedding"
                 W = tf.Variable(np.array(self.embeddings),name="W" ,dtype="float32",trainable = trainable)
                 

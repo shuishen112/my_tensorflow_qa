@@ -7,8 +7,8 @@ import time
 import datetime
 from data_helpers import batch_gen_with_pair_overlap,batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,parseData,batch_gen_with_pair_whole
 import operator
-from QA import QA
-from QA_CNN import QA_CNN
+from QA_CNN_point_wise import QA
+from QA_CNN_pair_wise import QA_CNN
 from QA_CNN_extend import QA_CNN_extend
 from attentive_pooling_network_test import QA_attentive
 import random
@@ -309,60 +309,6 @@ def test_pair_wise(dns = FLAGS.dns):
                     save_path = saver.save(sess, out_dir)
                     print "Model saved in file: ", save_path
                     map_max = map_mrr_test[0]
-'''
-def test_dns():
-    train,test,dev = load("wiki",filter = True)
-    q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
-    a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
-    q_max_sent_length = 40
-    a_max_sent_length = 40
-    print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
-    print 'train question unique:{}'.format(len(train['question'].unique()))
-    print 'train length',len(train)
-    print 'test length', len(test)
-    print 'dev length', len(dev)
-    alphabet = prepare([train,test,dev],is_embedding_needed = False)
-
-    print 'alphabet:',len(alphabet)
-
-    with tf.Graph().as_default():
-        # with tf.device("/cpu:0"):
-        session_conf = tf.ConfigProto(
-            allow_soft_placement=FLAGS.allow_soft_placement,
-            log_device_placement=FLAGS.log_device_placement)
-        sess = tf.Session(config=session_conf)
-        with sess.as_default(),open(precision,"w") as log:
-
-            # train,test,dev = load("trec",filter=True)
-            # alphabet,embeddings = prepare([train,test,dev],is_embedding_needed = True)
-            cnn = QA_CNN_Attentive(
-                max_input_left = q_max_sent_length,
-                max_input_right = a_max_sent_length,
-                batch_size = FLAGS.batch_size,
-                vocab_size = len(alphabet),
-                embedding_size = FLAGS.embedding_dim,
-                # filter_sizes = list(map(int, FLAGS.filter_sizes.split(","))),
-                num_filters = FLAGS.num_filters,                
-                dropout_keep_prob = FLAGS.dropout_keep_prob,
-                embeddings = None,                
-                l2_reg_lambda = FLAGS.l2_reg_lambda,
-                is_Embedding_Needed = False,
-                trainable = FLAGS.trainable)
-            # Define Training procedure
-            global_step = tf.Variable(0, name="global_step", trainable = False)
-            optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
-            grads_and_vars = optimizer.compute_gradients(cnn.loss)
-            train_op = optimizer.apply_gradients(grads_and_vars, global_step = global_step)
-            saver = tf.train.Saver(tf.all_variables(), max_to_keep = 20)
-            # Initialize all variables
-            sess.run(tf.global_variables_initializer())
-
-            for i in range(100):
-                samples = dns_sample(train,alphabet,q_max_sent_length,
-                    a_max_sent_length,sess,cnn,FLAGS.batch_size,neg_sample_num = 30)
-                for x_batch_1, x_batch_2, x_batch_3 in batch_gen_with_pair_dns(samples,FLAGS.batch_size):
-                    print i
-'''
 import pandas as pd
 def parser_data():
     
