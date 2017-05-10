@@ -47,7 +47,7 @@ tf.flags.DEFINE_float("l2_reg_lambda", 0.000001, "L2 regularizaion lambda (defau
 tf.flags.DEFINE_float("learning_rate", 1e-3, "learn rate( default: 0.0)")
 tf.flags.DEFINE_integer("max_len_left", 40, "max document length of left input")
 tf.flags.DEFINE_integer("max_len_right", 40, "max document length of right input")
-tf.flags.DEFINE_string("loss","point_wise","loss function (default:point_wise)")
+tf.flags.DEFINE_string("loss",'pair_wise,"loss function (default:point_wise)")
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
 tf.flags.DEFINE_boolean("trainable", True, "is embedding trainable? (default: False)")
@@ -236,7 +236,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 dropout_keep_prob = FLAGS.dropout_keep_prob,
                 embeddings = embeddings,                
                 l2_reg_lambda = FLAGS.l2_reg_lambda,
-                overlap_needed = FLAGS.overlap_needed_needed,
+                overlap_needed = FLAGS.overlap_needed,
                 learning_rate=FLAGS.learning_rate,
                 trainable = FLAGS.trainable,
                 model_type=FLAGS.CNN_type)
@@ -439,6 +439,6 @@ def test_quora(dns = False):
 
 if __name__ == '__main__':
     # test_quora()
+    test_pair_wise()
     # test_pair_wise()
-    # test_pair_wise()
-    test_point_wise()
+    # test_point_wise()
