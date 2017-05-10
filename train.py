@@ -47,7 +47,7 @@ tf.flags.DEFINE_float("l2_reg_lambda", 0.000001, "L2 regularizaion lambda (defau
 tf.flags.DEFINE_float("learning_rate", 1e-3, "learn rate( default: 0.0)")
 tf.flags.DEFINE_integer("max_len_left", 40, "max document length of left input")
 tf.flags.DEFINE_integer("max_len_right", 40, "max document length of right input")
-tf.flags.DEFINE_string("loss","pair_wise","loss function (default:point_wise)")
+tf.flags.DEFINE_string("loss","point_wise","loss function (default:point_wise)")
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
 tf.flags.DEFINE_boolean("trainable", True, "is embedding trainable? (default: False)")
@@ -75,14 +75,21 @@ precision = data_file + 'precise'
 @log_time_delta
 def predict(sess,cnn,test,alphabet,batch_size,q_len,a_len):
     scores=[]
-    for data in batch_gen_with_single(test,alphabet,batch_size,q_len,a_len):       
-        feed_dict = {
-                    cnn.question: data[0],
-                    cnn.answer: data[1],
-                    cnn.q_pos_overlap: data[2],
-                    cnn.a_pos_overlap: data[3]
-                }
-        score = sess.run(cnn.score12, feed_dict)
+    for data in batch_gen_with_single(test,alphabet,batch_size,q_len,a_len): 
+        if FLAGS.loss ==  'point_wise':
+            feed_dict = {
+                cnn.question: data[0],
+                cnn.answer: data[1]
+            }
+            score = sess.run(cnn.scores,feed_dict)
+        else:
+            feed_dict = {
+                        cnn.question: data[0],
+                        cnn.answer: data[1],
+                        cnn.q_pos_overlap: data[2],
+                        cnn.a_pos_overlap: data[3]
+                    }
+            score = sess.run(cnn.score12, feed_dict)
         scores.extend(score)
     return np.array(scores[:len(test)])
 
@@ -91,8 +98,7 @@ def prediction(sess,cnn,test,alphabet,q_len,a_len):
     question,answer,overlap = parseData(test,alphabet,q_len,a_len)
     feed_dict = {
         cnn.question:question,
-        cnn.answer:answer,
-        cnn.overlap:overlap
+        cnn.answer:answer
     }
     score = sess.run(cnn.scores,feed_dict)
     return score
@@ -132,7 +138,7 @@ def test_point_wise():
                 l2_reg_lambda = FLAGS.l2_reg_lambda,
                 is_Embedding_Needed = True,
                 trainable = FLAGS.trainable,
-                is_overlap = FLAGS.overlap)
+                is_overlap = FLAGS.overlap_needed)
 
             # Define Training procedure
             global_step = tf.Variable(0, name="global_step", trainable = False)
@@ -146,9 +152,9 @@ def test_point_wise():
             # seq_process(train, alphabet)
             # seq_process(test, alphabet)
             for i in range(100):
-                if FLAGS.overlap == False:
+                if FLAGS.overlap_needed == False:
 
-                    for x_left_batch, x_right_batch, y_batch in batch_gen_with_point_wise(train,alphabet,FLAGS.batch_size,overlap = FLAGS.overlap,
+                    for x_left_batch, x_right_batch, y_batch in batch_gen_with_point_wise(train,alphabet,FLAGS.batch_size,overlap = FLAGS.overlap_needed,
                         q_len = q_max_sent_length,a_len = a_max_sent_length):
                         feed_dict = {
                             cnn.question: x_left_batch,
@@ -162,7 +168,7 @@ def test_point_wise():
                        
                         print("{}: step {}, loss {:g}, acc {:g}  ".format(time_str, step, loss, accuracy))
                 else:
-                    for x_left_batch, x_right_batch, y_batch ,overlap in batch_gen_with_point_wise(train,alphabet,FLAGS.batch_size,overlap = FLAGS.overlap,
+                    for x_left_batch, x_right_batch, y_batch ,overlap in batch_gen_with_point_wise(train,alphabet,FLAGS.batch_size,overlap = FLAGS.overlap_needed,
                         q_len = q_max_sent_length,a_len = a_max_sent_length):
                         feed_dict = {
                             cnn.question: x_left_batch,
@@ -178,15 +184,15 @@ def test_point_wise():
                         print("{}: step {}, loss {:g}, acc {:g}  ".format(time_str, step, loss, accuracy))
                     # print loss
                 # predicted_train = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                predicted = prediction(sess,cnn,test,alphabet,q_max_sent_length,a_max_sent_length)
-                predicted_dev = prediction(sess,cnn,dev,alphabet,q_max_sent_length,a_max_sent_length)
-                # predicted_train = prediction(sess,cnn,train,alphabet,q_max_sent_length,a_max_sent_length)
+                predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+                map_mrr_train = evaluation.evaluationBypandas(train,predicted[:,-1])
+                predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 map_mrr_test = evaluation.evaluationBypandas(test,predicted[:,-1])
-                map_mrr_dev = evaluation.evaluationBypandas(dev,predicted_dev[:,-1])
-                
+                predicted = predict(sess,cnn,dev,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+                map_mrr_dev = evaluation.evaluationBypandas(dev,predicted[:,-1])
                 # map_mrr_train = evaluation.evaluationBypandas(train,predicted_train[:,-1])
                 # print evaluation.evaluationBypandas(train,predicted_train[:,-1])
-                # print "{}:train epoch:map mrr {}".format(i,map_mrr_train)
+                print "{}:train epoch:map mrr {}".format(i,map_mrr_train)
                 print "{}:test epoch:map mrr {}".format(i,map_mrr_test)
                 print "{}:dev epoch:map mrr {}".format(i,map_mrr_dev)
                 line = " {}: epoch: precision {}".format(i,map_mrr_test)
@@ -230,7 +236,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 dropout_keep_prob = FLAGS.dropout_keep_prob,
                 embeddings = embeddings,                
                 l2_reg_lambda = FLAGS.l2_reg_lambda,
-                overlap_needed = FLAGS.overlap_needed,
+                overlap_needed = FLAGS.overlap_needed_needed,
                 learning_rate=FLAGS.learning_rate,
                 trainable = FLAGS.trainable,
                 model_type=FLAGS.CNN_type)
@@ -287,8 +293,8 @@ def test_pair_wise(dns = FLAGS.dns):
                 map_mrr_train = evaluation.evaluationBypandas(train,predicted)
                 predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 map_mrr_test = evaluation.evaluationBypandas(test,predicted)
-                
-
+                predicted = predict(sess,cnn,dev,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+                map_mrr_dev = evaluation.evaluationBypandas(dev,predicted)
                 # # predicted_train = prediction(sess,cnn,train,alphabet,q_max_sent_length,a_max_sent_length)
                 # map_mrr_dev = evaluation.evaluationBypandas(dev,predicted_dev[:,-1])
                 # map_mrr_test = evaluation.evaluationBypandas(test,predicted[:,-1])
@@ -296,7 +302,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 # # print evaluation.evaluationBypandas(train,predicted_train[:,-1])
                 print "{}:epoch:train map mrr {}".format(i,map_mrr_train)
                 print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
-                # print "{}:epoch:map mrr {}".format(i,map_mrr_dev)
+                print "{}:epoch:map mrr {}".format(i,map_mrr_dev)
                 line = " {}:epoch: map_train{}----map_test{}".format(i,map_mrr_train[0],map_mrr_test[0])
                 log.write(line + '\n')
                 log.flush()
@@ -363,7 +369,7 @@ def test_quora(dns = False):
                 l2_reg_lambda = FLAGS.l2_reg_lambda,
                 is_Embedding_Needed = True,
                 trainable = FLAGS.trainable,
-                is_overlap = FLAGS.overlap)
+                is_overlap = FLAGS.overlap_needed)
 
             # Define Training procedure
             global_step = tf.Variable(0, name="global_step", trainable = False)
@@ -388,9 +394,9 @@ def test_quora(dns = False):
             for i in range(25):
 
                 print "epoch :{} begins".format(i)
-                if FLAGS.overlap == False:
+                if FLAGS.overlap_needed == False:
 
-                    for x_left_batch, x_right_batch, y_batch in batch_gen_with_point_wise(train,alphabet,FLAGS.batch_size,overlap = FLAGS.overlap,
+                    for x_left_batch, x_right_batch, y_batch in batch_gen_with_point_wise(train,alphabet,FLAGS.batch_size,overlap = FLAGS.overlap_needed,
                         q_len = q_max_sent_length,a_len = a_max_sent_length):
                         feed_dict = {
                             cnn.question: x_left_batch,
@@ -410,7 +416,7 @@ def test_quora(dns = False):
 
 
                 else:
-                    for x_left_batch, x_right_batch, y_batch ,overlap in batch_gen_with_point_wise(train,alphabet,FLAGS.batch_size,overlap = FLAGS.overlap,
+                    for x_left_batch, x_right_batch, y_batch ,overlap in batch_gen_with_point_wise(train,alphabet,FLAGS.batch_size,overlap = FLAGS.overlap_needed,
                         q_len = q_max_sent_length,a_len = a_max_sent_length):
                         feed_dict = {
                             cnn.question: x_left_batch,
@@ -434,5 +440,5 @@ def test_quora(dns = False):
 if __name__ == '__main__':
     # test_quora()
     # test_pair_wise()
-    test_pair_wise()
-    # test_point_wise()
+    # test_pair_wise()
+    test_point_wise()
