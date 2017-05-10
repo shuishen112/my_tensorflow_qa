@@ -47,7 +47,7 @@ tf.flags.DEFINE_float("l2_reg_lambda", 0.000001, "L2 regularizaion lambda (defau
 tf.flags.DEFINE_float("learning_rate", 1e-3, "learn rate( default: 0.0)")
 tf.flags.DEFINE_integer("max_len_left", 40, "max document length of left input")
 tf.flags.DEFINE_integer("max_len_right", 40, "max document length of right input")
-tf.flags.DEFINE_string("loss",'pair_wise,"loss function (default:point_wise)")
+tf.flags.DEFINE_string("loss","pair_wise","loss function (default:point_wise)")
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
 tf.flags.DEFINE_boolean("trainable", True, "is embedding trainable? (default: False)")
