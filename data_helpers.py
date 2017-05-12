@@ -21,6 +21,8 @@ cores = multiprocessing.cpu_count()
 dataset= "wiki"
 UNKNOWN_WORD_IDX = 0
 is_stemmed_needed = False
+
+isEnglish=False
 if is_stemmed_needed:
     stemmer = stem.lancaster.LancasterStemmer()
 class Alphabet(dict):
@@ -109,22 +111,46 @@ def load_bin_vec(words,fname='embedding/GoogleNews-vectors-negative300.bin'):
         return word_vecs
 def load_text_vec(alphabet,filename="",embedding_size = 100):
     vectors = {}
-    for i,line in enumerate(open(filename)):
-        if i % 100000 == 0:
-                print 'epch %d' % i
-        items = line.strip().split(' ')
-        if len(items) == 2:
-            vocab_size, embedding_size= items[0],items[1]
-            print ( vocab_size, embedding_size)
-        else:
-            word = items[0]
-            if word in alphabet:
+    with open(filename) as f:
+        i=0
+        for line in f:
+            i+=1
+            if i % 100000 == 0:
+                    print 'epch %d' % i
+            items = line.strip().split(' ')
+            if len(items) == 2:
+                vocab_size, embedding_size= items[0],items[1]
+                print ( vocab_size, embedding_size)
+            else:
+                word = items[0]
+                if word in alphabet:
+                    vectors[word] = items[1:]
+    print 'embedding_size',embedding_size
+    print 'done'
+    print 'words found in wor2vec embedding ',len(vectors.keys())
+    return vectors
+def load_text_vector_test(filename = "",embedding_size = 100):
+    vectors = {}
+    with open(filename) as f:
+        i=0
+        for line in f:
+            i+=1
+            if i % 100000 == 0:
+                    print 'epch %d' % i
+            items = line.strip().split(' ')
+            if len(items) == 2:
+                vocab_size, embedding_size= items[0],items[1]
+                print ( vocab_size, embedding_size)
+            else:
+                word = items[0]
+                print word
+                if i > 1000:
+                    exit()
                 vectors[word] = items[1:]
     print 'embedding_size',embedding_size
     print 'done'
     print 'words found in wor2vec embedding ',len(vectors.keys())
     return vectors
-
 def load_vectors( vectors,vocab,dim_size):
     if vocab==None:
         return
@@ -137,7 +163,8 @@ def encode_to_split(sentence,alphabet,max_sentence = 40):
     if is_stemmed_needed:
         tokens = [stemmer.stem(w.decode('utf-8')) for w in sentence.strip().lower().split() if w not in PUNCT]
     else:
-        tokens = [w for w in sentence.strip().lower().split() if w not in PUNCT]
+        # tokens = [w for w in sentence.strip().lower().split() if w not in PUNCT]
+        tokens = cut(sentence)
     for word in tokens:
         indices.append(alphabet[word])
     results=indices+[alphabet["END"]]*(max_sentence-len(indices))
@@ -249,12 +276,12 @@ def overlap_index(question,answer,q_len,a_len,stopwords = []):
     a_index = np.zeros(a_len)
 
     overlap = qset.intersection(aset)
-    for i,q in enumerate(cut(question)):
+    for i,q in enumerate(cut(question)[:q_len]):
         value = 1
         if q in overlap:
             value = 2
         q_index[i] = value
-    for i,a in enumerate(cut(answer)):
+    for i,a in enumerate(cut(answer)[:a_len]):
         value = 1
         if a in overlap:
             value = 2
@@ -449,16 +476,20 @@ def prepare_300(cropuses):
     sub_dict_embedding = load_bin_vec(alphabet)
     sub_embeddings = getSubVectorsFromDict(sub_dict_embedding,alphabet)
     return alphabet,sub_embeddings
-def cut(sentence,isEnglish = True):
+def cut(sentence,isEnglish = isEnglish):
     if isEnglish:
         tokens = sentence.lower().split()
     else:
         stopwords = { word.decode("utf-8") for word in open("model/chStopWordsSimple.txt").read().split()}
 
-        words = jieba.cut(str(sentence))
-        tokens = [word for word in words if word not in stopwords]
+        # words = jieba.cut(str(sentence))
+        tokens = [word for word in sentence.split() if word not in stopwords]
     return tokens
-def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False,isEnglish = True):
+def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False,flag = True):
+    isEnglish=flag
+    vocab_file = 'model/voc'
+    if os.path.exists(vocab_file) and not fresh:
+        alphabet = pickle.load(open(vocab_file,'r'))
     alphabet = Alphabet(start_feature_id=0)
     alphabet.add('UNKNOWN_WORD_IDX_0')  
     alphabet.add('END') 
@@ -466,7 +497,10 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False,isEnglis
     for corpus in cropuses:
         for texts in [corpus["question"],corpus["answer"]]:
             for sentence in texts:   
-                tokens = cut(sentence,isEnglish)
+                count += 1
+                if count % 1000 == 0:
+                    print count
+                tokens = cut(sentence)
                 for token in tokens:
                     if is_stemmed_needed:
                         # try:
@@ -474,10 +508,11 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False,isEnglis
                         # except Exception as e:
                         #     alphabet.add(token)
                         #     print type(e)
-                        count += 1
+                        
                     else:
 
                         alphabet.add(token)
+    pickle.dump(alphabet,open(vocab_file,'w'))
     if is_embedding_needed:
         sub_vec_file = 'embedding/sub_vector'
         if os.path.exists(sub_vec_file) and not fresh:
@@ -494,8 +529,8 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False,isEnglis
                     sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             else:
                 fname = 'model/dbqa.word2vec'
-                embeddings = load_text_vec(alphabet,fname)
-                sub_embeddings = getSubVectorsFromDict(embeddings,alphabet)
+                embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
+                sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             pickle.dump(sub_embeddings,open(sub_vec_file,'w'))
         # print (len(alphabet.keys()))
         # embeddings = load_vectors(vectors,alphabet.keys(),layer1_size)
@@ -851,18 +886,21 @@ def batch_gen_with_pair_dns(samples,batch_size,epoches=1):
             batch = pairs[i*batch_size:(i+1) * batch_size]
             yield ([pair[i] for pair in batch]  for i in range(3))           
 if __name__ == '__main__':
-    train,test,dev = load("nlpcc",filter = True)
+    # train,test,dev = load("nlpcc",filter = True)
     # q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
     # a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
     # print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
-    print 'train question unique:{}'.format(len(train['question'].unique()))
-    print 'train length',len(train)
-    print 'test length', len(test)
-    print 'dev length', len(dev)
+    # print 'train question unique:{}'.format(len(train['question'].unique()))
+    # print 'train length',len(train)
+    # print 'test length', len(test)
+    # print 'dev length', len(dev)
     
-    alphabet = prepare([train,test,dev],is_embedding_needed = False,isEnglish = False)
+    # alphabet = prepare([train,test,dev],is_embedding_needed = False,isEnglish = False)
 
-    print 'alphabet:',len(alphabet)
+    # print 'alphabet:',len(alphabet)
+    vec = load_text_vector_test(filename = "embedding/glove.6B/glove.6B.300d.txt",embedding_size = 300)
+    for k in vec.keys():
+        print k
     # load_bin_vec(alphabet)
         # exit()
     # word = 'interesting'

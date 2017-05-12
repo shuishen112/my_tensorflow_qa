@@ -203,14 +203,17 @@ def test_point_wise():
 @log_time_delta
 def test_pair_wise(dns = FLAGS.dns):
     train,test,dev = load(FLAGS.data,filter = True)
-    q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
-    a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
+    # train = train[:1000]
+    # test = test[:1000]
+    # dev = dev[:1000]
+    q_max_sent_length = 50#max(map(lambda x:len(x),train['question'].str.split()))
+    a_max_sent_length = 100#max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
     print 'train question unique:{}'.format(len(train['question'].unique()))
     print 'train length',len(train)
     print 'test length', len(test)
     print 'dev length', len(dev)
-    alphabet,embeddings = prepare([train,test,dev],dim = FLAGS.embedding_dim,is_embedding_needed = True,fresh = True,isEnglish = False)
+    alphabet,embeddings = prepare([train,test,dev],dim = FLAGS.embedding_dim,is_embedding_needed = True,fresh = True,flag = False)
     # alphabet,embeddings = prepare_300([train,test,dev])
     print 'alphabet:',len(alphabet)
 
@@ -345,7 +348,6 @@ def test_quora(dns = False):
     print 'train question unique:{}'.format(len(train['question'].unique()))
     print 'train length',len(train)
     print 'test length', len(test)
-
     alphabet,embeddings = prepare([train,test],is_embedding_needed = True,fresh = False)
     with tf.Graph().as_default():
         # with tf.device("/cpu:0"):
