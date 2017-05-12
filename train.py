@@ -56,8 +56,8 @@ tf.flags.DEFINE_integer("evaluate_every", 500, "Evaluate model on dev set after 
 tf.flags.DEFINE_integer("checkpoint_every", 500, "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_boolean('overlap_needed',False,"is overlap used")
 tf.flags.DEFINE_boolean('dns','False','whether use dns or not')
-tf.flags.DEFINE_string('data','wiki','data set')
-tf.flags.DEFINE_string('CNN_type','apn','data set')
+tf.flags.DEFINE_string('data','nlpcc','data set')
+tf.flags.DEFINE_string('CNN_type','qacnn','data set')
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
@@ -210,7 +210,7 @@ def test_pair_wise(dns = FLAGS.dns):
     print 'train length',len(train)
     print 'test length', len(test)
     print 'dev length', len(dev)
-    alphabet,embeddings = prepare([train,test,dev],dim = FLAGS.embedding_dim,is_embedding_needed = True,fresh = True)
+    alphabet,embeddings = prepare([train,test,dev],dim = FLAGS.embedding_dim,is_embedding_needed = True,fresh = True,isEnglish = False)
     # alphabet,embeddings = prepare_300([train,test,dev])
     print 'alphabet:',len(alphabet)
 

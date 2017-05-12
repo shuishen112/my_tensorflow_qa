@@ -12,6 +12,7 @@ import seaborn as sns
 import evaluation
 from features import overlap_jiabing,overlap_index
 import string
+import jieba
 from nltk import stem
 import chardet
 PUNCT = set(string.punctuation) - set('$%#')
@@ -465,7 +466,7 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False,isEnglis
     for corpus in cropuses:
         for texts in [corpus["question"],corpus["answer"]]:
             for sentence in texts:   
-                tokens = cut(sentence)
+                tokens = cut(sentence,isEnglish)
                 for token in tokens:
                     if is_stemmed_needed:
                         # try:
@@ -851,17 +852,18 @@ def batch_gen_with_pair_dns(samples,batch_size,epoches=1):
             yield ([pair[i] for pair in batch]  for i in range(3))           
 if __name__ == '__main__':
     train,test,dev = load("nlpcc",filter = True)
-    q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
-    a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
-    print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
+    # q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
+    # a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
+    # print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
     print 'train question unique:{}'.format(len(train['question'].unique()))
     print 'train length',len(train)
     print 'test length', len(test)
     print 'dev length', len(dev)
-    alphabet = prepare([train,test,dev],is_embedding_needed = False)
+    
+    alphabet = prepare([train,test,dev],is_embedding_needed = False,isEnglish = False)
 
     print 'alphabet:',len(alphabet)
-    load_bin_vec(alphabet)
+    # load_bin_vec(alphabet)
         # exit()
     # word = 'interesting'
     # print stemmer.stem(word)
