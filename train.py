@@ -203,9 +203,9 @@ def test_point_wise():
 @log_time_delta
 def test_pair_wise(dns = FLAGS.dns):
     train,test,dev = load(FLAGS.data,filter = True)
-    train = train[:10000]
-    test = test[:10000]
-    dev = dev[:10000]
+    # train = train[:10000]
+    # test = test[:10000]
+    # dev = dev[:10000]
     q_max_sent_length = 50#max(map(lambda x:len(x),train['question'].str.split()))
     a_max_sent_length = 100#max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
@@ -296,8 +296,8 @@ def test_pair_wise(dns = FLAGS.dns):
                 map_mrr_train = evaluation.evaluationBypandas(train,predicted)
                 predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 map_mrr_test = evaluation.evaluationBypandas(test,predicted)
-                # predicted = predict(sess,cnn,dev,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                # map_mrr_dev = evaluation.evaluationBypandas(dev,predicted)
+                predicted = predict(sess,cnn,dev,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+                map_mrr_dev = evaluation.evaluationBypandas(dev,predicted)
                 # # predicted_train = prediction(sess,cnn,train,alphabet,q_max_sent_length,a_max_sent_length)
                 # map_mrr_dev = evaluation.evaluationBypandas(dev,predicted_dev[:,-1])
                 # map_mrr_test = evaluation.evaluationBypandas(test,predicted[:,-1])
@@ -305,7 +305,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 # # print evaluation.evaluationBypandas(train,predicted_train[:,-1])
                 print "{}:epoch:train map mrr {}".format(i,map_mrr_train)
                 print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
-                # print "{}:epoch:dev map mrr {}".format(i,map_mrr_dev)
+                print "{}:epoch:dev map mrr {}".format(i,map_mrr_dev)
                 line = " {}:epoch: map_train{}----map_test{}".format(i,map_mrr_train[0],map_mrr_test[0])
                 log.write(line + '\n')
                 log.flush()

@@ -214,12 +214,14 @@ def test_ones():
 		print a.eval()
 def testU():
 	batch_size = 3
-	Q = tf.Variable(tf.random_uniform(shape = (batch_size,30,200)))
-	U = tf.Variable(tf.random_uniform(shape = (200,200)))
-	A = tf.Variable(tf.random_uniform(shape = (batch_size,40,200)))
-	first = tf.matmul(tf.reshape(Q,[-1,200]),U)
-	second_step = tf.reshape(first,[batch_size,-1,200])
+	num_filter = 5
+	Q = tf.Variable(tf.random_uniform(shape = (batch_size,3,num_filter)))
+	U = tf.Variable(tf.ones(shape = (num_filter,num_filter)))
+	A = tf.Variable(tf.random_uniform(shape = (batch_size,4,num_filter)))
+	first = tf.matmul(tf.reshape(Q,[-1,num_filter]),U)
+	second_step = tf.reshape(first,[batch_size,-1,num_filter])
 	result = tf.batch_matmul(second_step,tf.transpose(A,perm = [0,2,1]))
+	sum_ = tf.reduce_sum(Q,2)
 	print result
 	print second_step
 	print first
@@ -227,8 +229,11 @@ def testU():
 	print first
 	with tf.Session() as sess:
 		sess.run(tf.global_variables_initializer())
-		_,_,result = sess.run([Q,U,result])
-		print result
+		Q,first,U,sum_ = sess.run([Q,first,U,sum_])
+		print Q
+		print U
+		print first
+		print sum_
 if __name__ == '__main__':
 	# a = np.arange(100,200)
 	# a = map(str,a)
