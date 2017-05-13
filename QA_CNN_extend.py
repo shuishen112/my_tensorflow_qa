@@ -59,7 +59,7 @@ class QA_CNN_extend(object):
 
         if model_type=="apn":
             with tf.name_scope('attention'):    
-                self.U = tf.Variable(tf.truncated_normal(shape = [self.batch_size,self.num_filters * len(filter_sizes),\
+                self.U = tf.Variable(tf.truncated_normal(shape = [self.num_filters * len(filter_sizes),\
                     self.num_filters * len(filter_sizes)],stddev = 0.01,name = 'U'))
                 self.para.append(self.U)
 
@@ -168,8 +168,12 @@ class QA_CNN_extend(object):
         Q = tf.reshape(input_left,[self.batch_size,self.max_input_left,len(self.filter_sizes) * self.num_filters],name = 'Q')
         A = tf.reshape(input_right,[self.batch_size,self.max_input_right,len(self.filter_sizes) * self.num_filters],name = 'A')
 
-        G = tf.tanh(tf.matmul(tf.matmul(Q,self.U),\
-        A,transpose_b = True),name = 'G')
+        # G = tf.tanh(tf.matmul(tf.matmul(Q,self.U),\
+        # A,transpose_b = True),name = 'G')
+        first = tf.matmul(tf.reshape(Q,[-1,len(self.filter_sizes) * self.num_filters]),self.U)
+        second_step = tf.reshape(first,[self.batch_size,-1,len(self.filter_sizes) * self.num_filters])
+        result = tf.batch_matmul(second_step,tf.transpose(A,perm = [0,2,1]))
+        G = tf.tanh(result)
         # column-wise pooling ,row-wise pooling
         row_pooling = tf.reduce_max(G,1,True,name = 'row_pooling')
         col_pooling = tf.reduce_max(G,2,True,name = 'col_pooling')

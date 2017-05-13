@@ -8,7 +8,7 @@ import operator
 from QA import QA
 from QA_CNN import QA_CNN
 from QA_CNN_extend import QA_CNN_extend
-from attentive_pooling_network_test import QA_attentive
+from solid_attentive import QA_attentive
 import random
 import evaluation
 import cPickle as pickle

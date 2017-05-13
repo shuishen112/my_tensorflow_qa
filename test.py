@@ -212,7 +212,24 @@ def test_ones():
 	a = tf.ones([100,100,100])
 	with tf.Session() as sess:
 		print a.eval()
-if __name__ == "__main__":
+def testU():
+	batch_size = 3
+	Q = tf.Variable(tf.random_uniform(shape = (batch_size,30,200)))
+	U = tf.Variable(tf.random_uniform(shape = (200,200)))
+	A = tf.Variable(tf.random_uniform(shape = (batch_size,40,200)))
+	first = tf.matmul(tf.reshape(Q,[-1,200]),U)
+	second_step = tf.reshape(first,[batch_size,-1,200])
+	result = tf.batch_matmul(second_step,tf.transpose(A,perm = [0,2,1]))
+	print result
+	print second_step
+	print first
+	print U
+	print first
+	with tf.Session() as sess:
+		sess.run(tf.global_variables_initializer())
+		_,_,result = sess.run([Q,U,result])
+		print result
+if __name__ == '__main__':
 	# a = np.arange(100,200)
 	# a = map(str,a)
 	# index = np.random.choice(a,size = [30])
@@ -223,8 +240,7 @@ if __name__ == "__main__":
 	# print a[0]
 	# import chardet
 	# print chardet.detect(a[0])
-	a = 5
-	print type(a)
+	testU()
 	# testReshape()
 	# test_ones()
 	# testConcolution()W

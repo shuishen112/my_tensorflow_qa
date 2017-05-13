@@ -153,4 +153,3 @@ if __name__ == '__main__':
         sess.run(tf.global_variables_initializer())
         question,answer = sess.run([cnn.embedded_chars_q,cnn.embedded_chars_a],feed_dict = {cnn.question:input_x_1,cnn.answer:input_x_2,
             cnn.answer_negative:input_x_3})
-print question.shape,answer.shape

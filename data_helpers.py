@@ -22,7 +22,7 @@ dataset= "wiki"
 UNKNOWN_WORD_IDX = 0
 is_stemmed_needed = False
 
-isEnglish=False
+isEnglish = True
 if is_stemmed_needed:
     stemmer = stem.lancaster.LancasterStemmer()
 class Alphabet(dict):
@@ -43,31 +43,6 @@ class Alphabet(dict):
             for k in sorted(self.keys()):
                 out.write("{}\t{}\n".format(k, self[k]))
 
-def load_bin_vec1(fname="embedding/GoogleNews-vectors-negative300.bin"):
-    """
-    Loads 300x1 word vecs from Google (Mikolov) word2vec
-    """
-    # fname="embedding/aquaint+wiki.txt.gz.ndim=50.bin"
-    word_vecs = {}
-    with open(fname, "rb") as f:
-        header = f.readline()
-        vocab_size, layer1_size = map(int, header.split())
-        binary_len = np.dtype('float32').itemsize * layer1_size
-        print ('vocab_size, layer1_size', vocab_size, layer1_size)
-        for i, line in enumerate(range(vocab_size)):
-            if i % 100000 == 0:
-                print ('.',)
-            word = []
-            while True:
-                ch = f.read(1)
-                if ch == ' ':
-                    word = ''.join(word)
-                    break
-                if ch != '\n':
-                    word.append(ch)
-            word_vecs[word] = np.fromstring(f.read(binary_len), dtype='float32')
-
-        return word_vecs,layer1_size
 # get data for lexdecomp
 def load_bin_vec(words,fname='embedding/GoogleNews-vectors-negative300.bin'):
     print fname
@@ -180,7 +155,7 @@ def batch_gen_with_single(df,alphabet,batch_size = 10,q_len = 33,a_len = 40):
     for index,row in df.iterrows():
         quetion = encode_to_split(row["question"],alphabet,max_sentence = q_len)
         answer = encode_to_split(row["answer"],alphabet,max_sentence = a_len)
-        q_pos_overlap,a_pos_overlap=overlap_index(row["question"],row["answer"],q_len,a_len)
+        q_pos_overlap,a_pos_overlap = overlap_index(row["question"],row["answer"],q_len,a_len)
         pairs.append((quetion,answer,q_pos_overlap,a_pos_overlap))
     # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
     n_batches = int(len(pairs)*1.0/batch_size)
@@ -485,34 +460,34 @@ def cut(sentence,isEnglish = isEnglish):
         # words = jieba.cut(str(sentence))
         tokens = [word for word in sentence.split() if word not in stopwords]
     return tokens
-def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False,flag = True):
-    isEnglish=flag
+def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
     vocab_file = 'model/voc'
     if os.path.exists(vocab_file) and not fresh:
         alphabet = pickle.load(open(vocab_file,'r'))
-    alphabet = Alphabet(start_feature_id=0)
-    alphabet.add('UNKNOWN_WORD_IDX_0')  
-    alphabet.add('END') 
-    count = 0
-    for corpus in cropuses:
-        for texts in [corpus["question"],corpus["answer"]]:
-            for sentence in texts:   
-                count += 1
-                if count % 1000 == 0:
-                    print count
-                tokens = cut(sentence)
-                for token in tokens:
-                    if is_stemmed_needed:
-                        # try:
-                        alphabet.add(stemmer.stem(token.decode('utf-8')))
-                        # except Exception as e:
-                        #     alphabet.add(token)
-                        #     print type(e)
-                        
-                    else:
+    else:   
+        alphabet = Alphabet(start_feature_id=0)
+        alphabet.add('UNKNOWN_WORD_IDX_0')  
+        alphabet.add('END') 
+        count = 0
+        for corpus in cropuses:
+            for texts in [corpus["question"],corpus["answer"]]:
+                for sentence in texts:   
+                    count += 1
+                    if count % 100000 == 0:
+                        print count
+                    tokens = cut(sentence)
+                    for token in tokens:
+                        if is_stemmed_needed:
+                            # try:
+                            alphabet.add(stemmer.stem(token.decode('utf-8')))
+                            # except Exception as e:
+                            #     alphabet.add(token)
+                            #     print type(e)
+                            
+                        else:
 
-                        alphabet.add(token)
-    pickle.dump(alphabet,open(vocab_file,'w'))
+                            alphabet.add(token)
+        pickle.dump(alphabet,open(vocab_file,'w'))
     if is_embedding_needed:
         sub_vec_file = 'embedding/sub_vector'
         if os.path.exists(sub_vec_file) and not fresh:

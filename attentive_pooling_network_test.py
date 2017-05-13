@@ -53,7 +53,7 @@ class QA_attentive(object):
             a_pos_f = self.get_feature_map(a_pos_embedding)
             a_neg_f = self.get_feature_map(a_neg_embedding)
         with tf.name_scope('attention'):    
-            self.U = tf.Variable(tf.truncated_normal(shape = [self.batch_size,self.num_filters * len(filter_sizes),\
+            self.U = tf.Variable(tf.truncated_normal(shape = [self.num_filters * len(filter_sizes),\
                 self.num_filters * len(filter_sizes)],stddev = 0.01,name = 'U'))
             self.para.append(self.U)
         with tf.name_scope('score'):
@@ -163,6 +163,7 @@ class QA_attentive(object):
 
         G = tf.tanh(tf.matmul(tf.matmul(Q,self.U),\
         A,transpose_b = True),name = 'G')
+
         # column-wise pooling ,row-wise pooling
         row_pooling = tf.reduce_max(G,1,True,name = 'row_pooling')
         col_pooling = tf.reduce_max(G,2,True,name = 'col_pooling')
