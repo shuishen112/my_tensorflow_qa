@@ -206,8 +206,8 @@ def test_pair_wise(dns = FLAGS.dns):
     # train = train[:10000]
     # test = test[:10000]
     # dev = dev[:10000]
-    q_max_sent_length = 50#max(map(lambda x:len(x),train['question'].str.split()))
-    a_max_sent_length = 100#max(map(lambda x:len(x),train['answer'].str.split()))
+    q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
+    a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
     print 'train question unique:{}'.format(len(train['question'].unique()))
     print 'train length',len(train)
