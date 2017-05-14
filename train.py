@@ -306,7 +306,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 print "{}:epoch:train map mrr {}".format(i,map_mrr_train)
                 print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
                 print "{}:epoch:dev map mrr {}".format(i,map_mrr_dev)
-                line = " {}:epoch: map_train{}----map_test{}".format(i,map_mrr_train[0],map_mrr_test[0])
+                line = " {}:epoch: map_train{}----map_test{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_test[0],map_mrr_dev[0])
                 log.write(line + '\n')
                 log.flush()
                 if map_mrr_test[0] > map_max:
