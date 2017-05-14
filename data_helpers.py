@@ -22,7 +22,7 @@ dataset= "wiki"
 UNKNOWN_WORD_IDX = 0
 is_stemmed_needed = False
 
-isEnglish = True
+isEnglish = False
 if is_stemmed_needed:
     stemmer = stem.lancaster.LancasterStemmer()
 class Alphabet(dict):
@@ -438,19 +438,6 @@ def getSubVectors(vectors,vocab,dim = 50):
         else:
             embedding[vocab[word]]= np.random.uniform(-0.5,+0.5,vectors.syn0.shape[1])  #.tolist()
     return embedding
-def prepare_300(cropuses):
-    alphabet = Alphabet(start_feature_id=0)
-    alphabet.add('UNKNOWN_WORD_IDX_0')
-    alphabet.add('END')
-    for corpus in cropuses:
-        for texts in [corpus["question"],corpus["answer"]]:
-            for sentence in texts:
-                tokens = sentence.lower().split()
-                for token in sentence.lower().split():
-                    alphabet.add(token)
-    sub_dict_embedding = load_bin_vec(alphabet)
-    sub_embeddings = getSubVectorsFromDict(sub_dict_embedding,alphabet)
-    return alphabet,sub_embeddings
 def cut(sentence,isEnglish = isEnglish):
     if isEnglish:
         tokens = sentence.lower().split()
@@ -460,6 +447,7 @@ def cut(sentence,isEnglish = isEnglish):
         # words = jieba.cut(str(sentence))
         tokens = [word for word in sentence.split() if word not in stopwords]
     return tokens
+
 def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
     vocab_file = 'model/voc'
     if os.path.exists(vocab_file) and not fresh:
@@ -470,12 +458,13 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
         alphabet.add('END') 
         count = 0
         for corpus in cropuses:
-            for texts in [corpus["question"],corpus["answer"]]:
+            for texts in [corpus["question"].unique(),corpus["answer"]]:
                 for sentence in texts:   
                     count += 1
                     if count % 100000 == 0:
                         print count
                     tokens = cut(sentence)
+                    # print "#".join(tokens)
                     for token in tokens:
                         if is_stemmed_needed:
                             # try:
@@ -487,6 +476,7 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
                         else:
 
                             alphabet.add(token)
+        print 'count sentence',count
         pickle.dump(alphabet,open(vocab_file,'w'))
     if is_embedding_needed:
         sub_vec_file = 'embedding/sub_vector'
@@ -861,21 +851,19 @@ def batch_gen_with_pair_dns(samples,batch_size,epoches=1):
             batch = pairs[i*batch_size:(i+1) * batch_size]
             yield ([pair[i] for pair in batch]  for i in range(3))           
 if __name__ == '__main__':
-    # train,test,dev = load("nlpcc",filter = True)
-    # q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
-    # a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
-    # print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
-    # print 'train question unique:{}'.format(len(train['question'].unique()))
-    # print 'train length',len(train)
-    # print 'test length', len(test)
-    # print 'dev length', len(dev)
-    
-    # alphabet = prepare([train,test,dev],is_embedding_needed = False,isEnglish = False)
+    train,test,dev = load("wiki",filter = True)
+    q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
+    a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
+    print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
+    print 'train question unique:{}'.format(len(train['question'].unique()))
+    print 'train length',len(train)
+    print 'test length', len(test)
+    print 'dev length', len(dev)
 
     # print 'alphabet:',len(alphabet)
-    vec = load_text_vector_test(filename = "embedding/glove.6B/glove.6B.300d.txt",embedding_size = 300)
-    for k in vec.keys():
-        print k
+    # vec = load_text_vector_test(filename = "embedding/glove.6B/glove.6B.300d.txt",embedding_size = 300)
+    # for k in vec.keys():
+    #     print k
     # load_bin_vec(alphabet)
         # exit()
     # word = 'interesting'

@@ -56,7 +56,7 @@ tf.flags.DEFINE_integer("evaluate_every", 500, "Evaluate model on dev set after 
 tf.flags.DEFINE_integer("checkpoint_every", 500, "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_boolean('overlap_needed',False,"is overlap used")
 tf.flags.DEFINE_boolean('dns','False','whether use dns or not')
-tf.flags.DEFINE_string('data','wiki','data set')
+tf.flags.DEFINE_string('data','nlpcc','data set')
 tf.flags.DEFINE_string('CNN_type','apn','data set')
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
@@ -113,7 +113,7 @@ def test_point_wise():
     print 'test length', len(test)
     print 'dev length', len(dev)
 
-    alphabet,embeddings = prepare([train,test,dev],is_embedding_needed = True)
+    alphabet,embeddings = prepare([train,test,dev],dim = FLAGS.embedding_dim,is_embedding_needed = True,fresh = True)
     print 'alphabet:',len(alphabet)
     with tf.Graph().as_default():
         # with tf.device("/cpu:0"):
@@ -195,7 +195,7 @@ def test_point_wise():
                 print "{}:train epoch:map mrr {}".format(i,map_mrr_train)
                 print "{}:test epoch:map mrr {}".format(i,map_mrr_test)
                 print "{}:dev epoch:map mrr {}".format(i,map_mrr_dev)
-                line = " {}: epoch: precision {}".format(i,map_mrr_test)
+                line = " {}:epoch: map_train{}----map_test{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_test[0],map_mrr_dev[0])
                 log.write(line + '\n')
                 log.flush()
             log.close()
@@ -255,7 +255,7 @@ def test_pair_wise(dns = FLAGS.dns):
             sess.run(tf.global_variables_initializer())
             print "variables_initializer"
             if dns == True:
-                loadfile="tmp/20170502223124__0.678083232207.ckpt"
+                loadfile="runs/20170513/20170514042828__wiki0.716650540915"
                 saver.restore(sess, loadfile)
                 predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 map_mrr_train = evaluation.evaluationBypandas(train,predicted)
@@ -321,6 +321,9 @@ def test_pair_wise(dns = FLAGS.dns):
 
 if __name__ == '__main__':
     # test_quora()
-    test_pair_wise()
+    if FLAGS.loss == 'point_wise':
+        test_point_wise()
+    else:
+        test_pair_wise()
     # test_pair_wise()
     # test_point_wise()
