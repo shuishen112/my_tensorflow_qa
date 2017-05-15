@@ -461,7 +461,7 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
             for texts in [corpus["question"].unique(),corpus["answer"]]:
                 for sentence in texts:   
                     count += 1
-                    if count % 100000 == 0:
+                    if count % 10000 == 0:
                         print count
                     tokens = cut(sentence)
                     # print "#".join(tokens)
@@ -776,7 +776,7 @@ def main():
         # exit()
 def random_result():
     train,test,dev = load("wiki",filter = True)
-    test = test.reindex(np.random.permutation(test.index))
+    # test = test.reindex(np.random.permutation(test.index))
 
     # test['pred'] = test.apply(idf_word_overlap,axis = 1)
     pred = np.random.randn(len(test))
@@ -849,17 +849,31 @@ def batch_gen_with_pair_dns(samples,batch_size,epoches=1):
         pairs = sklearn.utils.shuffle(samples,random_state =132)
         for i in range(0,n_batches):
             batch = pairs[i*batch_size:(i+1) * batch_size]
-            yield ([pair[i] for pair in batch]  for i in range(3))           
-if __name__ == '__main__':
-    train,test,dev = load("wiki",filter = True)
-    q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
-    a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
-    print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
-    print 'train question unique:{}'.format(len(train['question'].unique()))
-    print 'train length',len(train)
-    print 'test length', len(test)
-    print 'dev length', len(dev)
+            yield ([pair[i] for pair in batch]  for i in range(3))   
+def data_sample_for_dev(dataset):
+    data_dir = "data/" + dataset
+    train_file = os.path.join(data_dir,"train.txt")
+    dev_file = os.path.join(data_dir,'dev.txt')
+    train = pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
 
+    dev = train.sample(frac = 0.7)
+    print dev
+    dev.to_csv(dev_file,index = None,sep = '\t',header = None,quoting = 3)
+def sample_data(df,frac = 0.5):
+    df = df.sample(frac = frac).reset_index()
+    return df
+
+
+if __name__ == '__main__':
+    # train,test,dev = load("wiki",filter = True)
+    # q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
+    # a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
+    # print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
+    # print 'train question unique:{}'.format(len(train['question'].unique()))
+    # print 'train length',len(train)
+    # print 'test length', len(test)
+    # print 'dev length', len(dev)
+    data_sample_for_dev('nlpcc')
     # print 'alphabet:',len(alphabet)
     # vec = load_text_vector_test(filename = "embedding/glove.6B/glove.6B.300d.txt",embedding_size = 300)
     # for k in vec.keys():

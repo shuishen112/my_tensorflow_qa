@@ -245,7 +245,14 @@ if __name__ == '__main__':
 	# print a[0]
 	# import chardet
 	# print chardet.detect(a[0])
-	testU()
+	# testU()
+	a = np.random.rand(100)
+	import pandas as pd
+	print a
+	df = pd.DataFrame(a)
+	df_0 = df.sample(frac = 0.7)
+	df = df_0.reset_index()
+	print df
 	# testReshape()
 	# test_ones()
 	# testConcolution()W

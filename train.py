@@ -5,7 +5,7 @@ import numpy as np
 import os
 import time
 import datetime
-from data_helpers import batch_gen_with_pair_overlap,batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,parseData,batch_gen_with_pair_whole
+from data_helpers import sample_data,batch_gen_with_pair_overlap,batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,parseData,batch_gen_with_pair_whole
 import operator
 from QA_CNN_point_wise import QA
 from QA_CNN_pair_wise import QA_CNN
@@ -14,6 +14,7 @@ from attentive_pooling_network_test import QA_attentive
 import random
 import evaluation
 import cPickle as pickle
+from sklearn.model_selection import train_test_split
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 now = int(time.time()) 
@@ -58,6 +59,7 @@ tf.flags.DEFINE_boolean('overlap_needed',False,"is overlap used")
 tf.flags.DEFINE_boolean('dns','False','whether use dns or not')
 tf.flags.DEFINE_string('data','nlpcc','data set')
 tf.flags.DEFINE_string('CNN_type','apn','data set')
+tf.flags.DEFINE_float('sample_train',0.5,'sampe my train data')
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
@@ -203,11 +205,13 @@ def test_point_wise():
 @log_time_delta
 def test_pair_wise(dns = FLAGS.dns):
     train,test,dev = load(FLAGS.data,filter = True)
+    train = sample_data(train,frac = FLAGS.sample_train)
+
     # train = train[:10000]
     # test = test[:10000]
     # dev = dev[:10000]
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
-    a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
+    a_max_sent_length = 200#max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
     print 'train question unique:{}'.format(len(train['question'].unique()))
     print 'train length',len(train)
@@ -265,7 +269,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 print map_mrr_test
             # seq_process(train, alphabet)
             # seq_process(test, alphabet)
-            map_max = 0.65
+            map_max = 0.70
             for i in range(1000):
                 if dns ==True:
                     samples = dns_sample(train,alphabet,q_max_sent_length,
@@ -294,8 +298,10 @@ def test_pair_wise(dns = FLAGS.dns):
                     # print loss
                 predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 map_mrr_train = evaluation.evaluationBypandas(train,predicted)
-                predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                map_mrr_test = evaluation.evaluationBypandas(test,predicted)
+                if i % 5 == 0:
+                    predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+                    map_mrr_test = evaluation.evaluationBypandas(test,predicted)
+                    print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
                 predicted = predict(sess,cnn,dev,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 map_mrr_dev = evaluation.evaluationBypandas(dev,predicted)
                 # # predicted_train = prediction(sess,cnn,train,alphabet,q_max_sent_length,a_max_sent_length)
@@ -304,9 +310,10 @@ def test_pair_wise(dns = FLAGS.dns):
                 # map_mrr_train = evaluation.evaluationBypandas(train,predicted_train[:,-1])
                 # # print evaluation.evaluationBypandas(train,predicted_train[:,-1])
                 print "{}:epoch:train map mrr {}".format(i,map_mrr_train)
-                print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
+                # print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
                 print "{}:epoch:dev map mrr {}".format(i,map_mrr_dev)
-                line = " {}:epoch: map_train{}----map_test{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_test[0],map_mrr_dev[0])
+                # line = " {}:epoch: map_train{}----map_test{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_test[0],map_mrr_dev[0])
+                line = " {}:epoch: map_train{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_dev[0])
                 log.write(line + '\n')
                 log.flush()
                 if map_mrr_test[0] > map_max:
