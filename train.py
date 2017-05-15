@@ -206,6 +206,9 @@ def test_point_wise():
 def test_pair_wise(dns = FLAGS.dns):
     train,test,dev = load(FLAGS.data,filter = True)
     train = sample_data(train,frac = FLAGS.sample_train)
+    train = train[:1000]
+    test = test[:1000]
+    dev = dev[:1000]
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
     a_max_sent_length = 200#max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
@@ -298,6 +301,15 @@ def test_pair_wise(dns = FLAGS.dns):
                     predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                     map_mrr_test = evaluation.evaluationBypandas(test,predicted)
                     print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
+                    if map_mrr_test[0] > map_max:
+                        timeStamp = time.strftime("%Y%m%d%H%M%S", time.localtime(int(time.time())))
+                        folder = 'runs/' + timeDay
+                        out_dir = folder +'/'+timeStamp+'__'+FLAGS.data+str(map_mrr_test[0])
+                        if not os.path.exists(folder):
+                            os.makedirs(folder)
+                        save_path = saver.save(sess, out_dir)
+                        print "Model saved in file: ", save_path
+                        map_max = map_mrr_test[0]
                 predicted = predict(sess,cnn,dev,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 map_mrr_dev = evaluation.evaluationBypandas(dev,predicted)
                 # # predicted_train = prediction(sess,cnn,train,alphabet,q_max_sent_length,a_max_sent_length)
@@ -312,15 +324,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 line = " {}:epoch: map_train{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_dev[0])
                 log.write(line + '\n')
                 log.flush()
-                if map_mrr_test[0] > map_max:
-                    timeStamp = time.strftime("%Y%m%d%H%M%S", time.localtime(int(time.time())))
-                    folder = 'runs/' + timeDay
-                    out_dir = folder +'/'+timeStamp+'__'+FLAGS.data+str(map_mrr_test[0])
-                    if not os.path.exists(folder):
-                        os.makedirs(folder)
-                    save_path = saver.save(sess, out_dir)
-                    print "Model saved in file: ", save_path
-                    map_max = map_mrr_test[0]
+                
 
 if __name__ == '__main__':
     # test_quora()
