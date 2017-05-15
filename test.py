@@ -248,11 +248,8 @@ if __name__ == '__main__':
 	# testU()
 	a = np.random.rand(100)
 	import pandas as pd
-	print a
-	df = pd.DataFrame(a)
-	df_0 = df.sample(frac = 0.7)
-	df = df_0.reset_index()
-	print df
+	df = pd.DataFrame(np.random.randn(50, 4), columns=list('ABCD'))
+	print df.sample(frac = 0.1)
 	# testReshape()
 	# test_ones()
 	# testConcolution()W

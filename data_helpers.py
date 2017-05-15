@@ -860,7 +860,8 @@ def data_sample_for_dev(dataset):
     print dev
     dev.to_csv(dev_file,index = None,sep = '\t',header = None,quoting = 3)
 def sample_data(df,frac = 0.5):
-    df = df.sample(frac = frac).reset_index()
+    df = df.sample(frac = frac)
+    df = df.reset_index(drop = True)
     return df
 
 

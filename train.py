@@ -206,10 +206,6 @@ def test_point_wise():
 def test_pair_wise(dns = FLAGS.dns):
     train,test,dev = load(FLAGS.data,filter = True)
     train = sample_data(train,frac = FLAGS.sample_train)
-
-    # train = train[:10000]
-    # test = test[:10000]
-    # dev = dev[:10000]
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
     a_max_sent_length = 200#max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
@@ -298,7 +294,7 @@ def test_pair_wise(dns = FLAGS.dns):
                     # print loss
                 predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 map_mrr_train = evaluation.evaluationBypandas(train,predicted)
-                if i % 5 == 0:
+                if (i + 1) % 5 == 0:
                     predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                     map_mrr_test = evaluation.evaluationBypandas(test,predicted)
                     print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
