@@ -85,31 +85,7 @@ def idf_overlap(row,stopwords = []):
 	for word in overlap:
 		idf_overlap += idf_outer.get(word,0)
 	return idf_overlap
-def overlap_visualize():
-    train,test,dev = load("trec",filter=False)
-    test = test.reindex(np.random.permutation(test.index))
-    df = test
-    df['qlen'] = df['question'].str.len()
-    df['alen'] = df['answer'].str.len()
 
-    df['q_n_words'] = df['question'].apply(lambda row:len(row.split(' ')))
-    df['a_n_words'] = df['answer'].apply(lambda row:len(row.split(' ')))
-
-    def normalized_word_share(row):
-        w1 = set(map(lambda word: word.lower().strip(), row['question'].split(" ")))
-        w2 = set(map(lambda word: word.lower().strip(), row['answer'].split(" ")))    
-        return 1.0 * len(w1 & w2)/(len(w1) + len(w2))
-    df['word_share'] = df.apply(normalized_word_share, axis=1)
-
-    plt.figure(figsize=(12, 8))
-    plt.subplot(1,2,1)
-    sns.violinplot(x = 'flag', y = 'word_share', data = df[0:50000])
-    plt.subplot(1,2,2)
-    sns.distplot(df[df['flag'] == 1.0]['word_share'][0:10000], color = 'green')
-    sns.distplot(df[df['flag'] == 0.0]['word_share'][0:10000], color = 'red')
-
-    print evaluation.evaluationBypandas(test,df['word_share'])
-    plt.show('hold')
 def get_feature():
 	train,test,dev = load("trec",filter = False)
 	test = test.reindex(np.random.permutation(test.index))
@@ -120,6 +96,6 @@ def get_feature():
 
 if __name__ == '__main__':
 	# get_feature()
-	data_processing()
+	# data_processing()
 	# random_result()
-	# overlap_visualize()
+	overlap_visualize()

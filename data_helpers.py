@@ -714,7 +714,7 @@ def loadData(dataset = dataset):
 
 
 def data_processing():
-    train,test,dev = load('trec',filter = False)
+    train,test,dev = load('nlpcc',filter = False)
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
     a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
     print('Total number of unique question:{}'.format(len(train['question'].unique())))
@@ -759,7 +759,31 @@ def data_processing():
     print('Questions with capitalised first letters: {:.2f}%'.format(capital_first * 100))
     print('Questions with capital letters: {:.2f}%'.format(capitals * 100))
     print('Questions with numbers: {:.2f}%'.format(numbers * 100))
+def overlap_visualize():
+    train,test,dev = load("nlpcc",filter=True)
+    test = test.reindex(np.random.permutation(test.index))
+    df = test
+    df['qlen'] = df['question'].str.len()
+    df['alen'] = df['answer'].str.len()
 
+    df['q_n_words'] = df['question'].apply(lambda row:len(row.split(' ')))
+    df['a_n_words'] = df['answer'].apply(lambda row:len(row.split(' ')))
+
+    def normalized_word_share(row):
+        w1 = set(map(lambda word: word.lower().strip(), row['question'].split(" ")))
+        w2 = set(map(lambda word: word.lower().strip(), row['answer'].split(" ")))    
+        return 1.0 * len(w1 & w2)/(len(w1) + len(w2))
+    df['word_share'] = df.apply(normalized_word_share, axis=1)
+
+    plt.figure(figsize=(12, 8))
+    plt.subplot(1,2,1)
+    sns.violinplot(x = 'flag', y = 'word_share', data = df[0:50000])
+    plt.subplot(1,2,2)
+    sns.distplot(df[df['flag'] == 1.0]['word_share'][0:10000], color = 'green')
+    sns.distplot(df[df['flag'] == 0.0]['word_share'][0:10000], color = 'red')
+
+    print evaluation.evaluationBypandas(test,df['word_share'])
+    plt.show('hold')
 def main():
     train,test,dev = load("trec",filter=False)
     alphabet,embeddings = prepare([train,test,dev],is_embedding_needed = True)
@@ -874,7 +898,7 @@ if __name__ == '__main__':
     # print 'train length',len(train)
     # print 'test length', len(test)
     # print 'dev length', len(dev)
-    data_sample_for_dev('nlpcc')
+    overlap_visualize()
     # print 'alphabet:',len(alphabet)
     # vec = load_text_vector_test(filename = "embedding/glove.6B/glove.6B.300d.txt",embedding_size = 300)
     # for k in vec.keys():
