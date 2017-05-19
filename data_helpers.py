@@ -1,3 +1,4 @@
+# -*- coding:utf-8-*-
 import numpy as np
 import random,os,math
 import pandas as pd
@@ -22,6 +23,22 @@ dataset= "wiki"
 UNKNOWN_WORD_IDX = 0
 is_stemmed_needed = False
 
+
+
+from functools import wraps
+#print( tf.__version__)
+def log_time_delta(func):
+    @wraps(func)
+    def _deco(*args, **kwargs):
+        start = time.time()
+        ret = func(*args, **kwargs)
+        end = time.time()
+        delta = end - start
+        print( "%s runed %.2f seconds"% (func.__name__,delta))
+        return ret
+    return _deco
+
+
 isEnglish = False
 if is_stemmed_needed:
     stemmer = stem.lancaster.LancasterStemmer()
@@ -44,6 +61,7 @@ class Alphabet(dict):
                 out.write("{}\t{}\n".format(k, self[k]))
 
 # get data for lexdecomp
+@log_time_delta
 def load_bin_vec(words,fname='embedding/GoogleNews-vectors-negative300.bin'):
     print fname
     vocab = set(words)
@@ -149,7 +167,7 @@ def transform(flag):
         return [0,1]
     else:
         return [1,0]
-
+@log_time_delta
 def batch_gen_with_single(df,alphabet,batch_size = 10,q_len = 33,a_len = 40):
     pairs=[]
     for index,row in df.iterrows():
@@ -166,6 +184,7 @@ def batch_gen_with_single(df,alphabet,batch_size = 10,q_len = 33,a_len = 40):
         yield [[pair[j] for pair in batch]  for j in range(4)]
     batch= pairs[n_batches*batch_size:] + [pairs[n_batches*batch_size]] * (batch_size- len(pairs)+n_batches*batch_size  )
     yield [[pair[i] for pair in batch]  for i in range(4)]
+@log_time_delta
 def batch_gen_with_single_attentive(df,alphabet,batch_size = 10,q_len = 33,a_len = 40):
     pairs=[]
     for index,row in df.iterrows():
@@ -194,6 +213,7 @@ def parseData(df,alphabet,q_len = 33,a_len = 40):
         a.append(answer)
         overlap.append(lap)
     return q,a,overlap
+@log_time_delta
 def batch_gen_with_point_wise(df,alphabet, batch_size=10,overlap = False,q_len = 33,a_len = 40):
     #inputq inputa intput_y overlap
     if overlap:
@@ -220,7 +240,7 @@ def batch_gen_with_point_wise(df,alphabet, batch_size=10,overlap = False,q_len =
         yield (np.array([pair[i] for pair in batch])  for i in range(input_num))
     batch= pairs[n_batches*batch_size:] + [pairs[n_batches*batch_size]] * (batch_size- len(pairs)+n_batches*batch_size  )
     yield (np.array([pair[i] for pair in batch])  for i in range(input_num))
-
+@log_time_delta
 def batch_gen_with_pair(df,alphabet, batch_size=10,q_len = 40,a_len = 40):
     pairs=[]
     for question in df["question"].unique():
@@ -262,7 +282,7 @@ def overlap_index(question,answer,q_len,a_len,stopwords = []):
             value = 2
         a_index[i] = value
     return q_index,a_index
-
+@log_time_delta
 def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 40):
     pairs=[]
     for question in df["question"].unique():
@@ -447,7 +467,7 @@ def cut(sentence,isEnglish = isEnglish):
         # words = jieba.cut(str(sentence))
         tokens = [word for word in sentence.split() if word not in stopwords]
     return tokens
-
+@log_time_delta
 def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
     vocab_file = 'model/voc'
     if os.path.exists(vocab_file) and not fresh:
@@ -714,9 +734,13 @@ def loadData(dataset = dataset):
 
 
 def data_processing():
-    train,test,dev = load('nlpcc',filter = False)
+    train,test,dev = load('nlpcc',filter = True)
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
     a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
+    q_len = map(lambda x:len(x),train['question'].str.split())
+    a_len = map(lambda x:len(x),train['answer'].str.split())
+    print np.max(q_len)
+    print np.max(a_len)
     print('Total number of unique question:{}'.format(len(train['question'].unique())))
     print('Total number of question pairs for training: {}'.format(len(train)))
     print('Total number of question pairs for test: {}'.format(len(test)))
@@ -866,6 +890,7 @@ def dns_sample(df,alphabet,q_len,a_len,sess,model,batch_size,neg_sample_num = 10
                     print 'samples load:{}'.format(count)
     print 'samples finishted len samples:{}'.format(len(samples))
     return samples
+@log_time_delta
 def batch_gen_with_pair_dns(samples,batch_size,epoches=1):
     # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
     n_batches = int(len(samples) * 1.0 / batch_size)
@@ -887,10 +912,22 @@ def sample_data(df,frac = 0.5):
     df = df.sample(frac = frac)
     df = df.reset_index(drop = True)
     return df
-
-
+def replace_number(data):
+    for df in data:
+        df['question'] = df['question'].str.replace(r'[A-Za-z]+','english')
+        df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','english')
 if __name__ == '__main__':
-    # train,test,dev = load("wiki",filter = True)
+    data_processing()
+    # train,test,dev = load('nlpcc',filter = True)
+    # replace_number([train,test,dev])
+    # print train
+    # exit()
+    # # alphabet,embeddings = prepare([train,test,dev],dim = 300,is_embedding_needed = True,fresh = True)
+    # print len(alphabet)
+    # file = open('word_wiki.txt','w')
+    # for w in alphabet:
+    #     file.write(w + '\n')
+    # data_processing()
     # q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
     # a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
     # print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
@@ -898,7 +935,7 @@ if __name__ == '__main__':
     # print 'train length',len(train)
     # print 'test length', len(test)
     # print 'dev length', len(dev)
-    overlap_visualize()
+    # overlap_visualize()
     # print 'alphabet:',len(alphabet)
     # vec = load_text_vector_test(filename = "embedding/glove.6B/glove.6B.300d.txt",embedding_size = 300)
     # for k in vec.keys():
@@ -908,14 +945,6 @@ if __name__ == '__main__':
     # word = 'interesting'
     # print stemmer.stem(word)
     # train,test,dev = load("wiki",filter = True)
-    # alphabet,embeddings = prepare_300([train,test,dev])
-    # print len(alphabet),len(embeddings)
-    # random_result()
-    # data_processing()
-    # random_result()
-    # alphabet = prepare([train,test,dev],is_embedding_needed = False)
-    # embedding_file = 'embedding/GoogleNews-vectors-negative300.bin'
-    # load_bin_vec(embedding_file,alphabet.keys())
-    # getDataFolexdecomp()
-    # main()
+    # alphabet,embeddings = prepare([train,test,dev])
+
 

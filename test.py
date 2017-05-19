@@ -1,3 +1,4 @@
+# -*- coding:utf-8-*-
 '''
 import tensorflow as tf
 
@@ -234,7 +235,47 @@ def testU():
 		print U
 		print first
 		print sum_
+def test_log():
+	y = tf.constant([0.0,1.0])
+	p = tf.Variable(tf.random_uniform(shape = [1,2]))
+	loss1 = tf.reduce_sum(y * tf.log(p),reduction_indices = [1])
+	loss2 = tf.nn.softmax_cross_entropy_with_logits(y,p)
+	with tf.Session() as sess:
+		sess.run(tf.global_variables_initializer())
+		loss1,loss2,p = sess.run([loss1,loss2,p])
+		print np.log(p)
+		print loss2
+		print loss1
+def test_similarity():
+	num_filters_total = 10
+	left = tf.Variable(tf.random_uniform(shape = [3,10]))
+	right = tf.Variable(tf.random_uniform(shape = [4,10]))
+	W = tf.get_variable(
+        "W",
+        shape=[num_filters_total, num_filters_total],
+        initializer=tf.contrib.layers.xavier_initializer())
+	transform = tf.matmul(left,W)
+	sims = tf.reduce_sum(tf.mul(transform, right), 1, keep_dims=True)
+	print sims
+	with tf.Session() as sess:
+		sess.run(tf.global_variables_initializer())
+		print sess.run(left)
 if __name__ == '__main__':
+	# test_log()
+	# mygenerator = (x*x for x in range(3))
+	# for i in mygenerator:
+	# 	print i
+	# for i in mygenerator:
+	# 	print i
+
+	def createGenerator():
+		mylist = range(3)
+		for i in mylist:
+			yield i * i,i * i * i
+	for j in range(5):
+		mygenerator = createGenerator()
+		for i in mygenerator:
+			print i
 	# a = np.arange(100,200)
 	# a = map(str,a)
 	# index = np.random.choice(a,size = [30])
@@ -246,10 +287,7 @@ if __name__ == '__main__':
 	# import chardet
 	# print chardet.detect(a[0])
 	# testU()
-	a = np.random.rand(100)
-	import pandas as pd
-	df = pd.DataFrame(np.random.randn(50, 4), columns=list('ABCD'))
-	print df.sample(frac = 0.1)
+
 	# testReshape()
 	# test_ones()
 	# testConcolution()W

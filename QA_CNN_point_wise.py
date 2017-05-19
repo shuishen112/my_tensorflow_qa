@@ -33,6 +33,8 @@ class QA(object):
             self.embedding_W = W
             self.embedded_chars_q = tf.expand_dims(tf.nn.embedding_lookup(W,self.question),-1)
             self.embedded_chars_a = tf.expand_dims(tf.nn.embedding_lookup(W,self.answer),-1)
+            print self.embedded_chars_q
+            print self.embedded_chars_a
             self.para.append(self.embedding_W)
         # Create a convolution + maxpool layer for each filter size
         pooled_outputs_left = []
@@ -52,6 +54,7 @@ class QA(object):
                     strides=[1, 1, 1, 1],
                     padding="VALID",
                     name="conv")
+                print conv
                 # Apply nonlinearity
                 h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
                 # Maxpooling over the outputs
@@ -61,6 +64,7 @@ class QA(object):
                     strides=[1, 1, 1, 1],
                     padding='VALID',
                     name="pool")
+                print pooled
                 pooled_outputs_left.append(pooled)
             with tf.name_scope("conv-maxpool-right-%s" % filter_size):
                 conv = tf.nn.conv2d(
@@ -86,17 +90,27 @@ class QA(object):
         self.h_pool_right = tf.reshape(tf.concat(3, pooled_outputs_right), [-1, num_filters_total], name='h_pool_right')
         print self.h_pool_left
         print self.h_pool_right
+
+        with tf.name_scope("similarity"):
+            W = tf.get_variable(
+                "W",
+                shape=[num_filters_total, num_filters_total],
+                initializer=tf.contrib.layers.xavier_initializer())
+            self.transform_left = tf.matmul(self.h_pool_left, W)
+            self.sims = tf.reduce_sum(tf.mul(self.transform_left, self.h_pool_right), 1, keep_dims=True)
+            self.para.append(W)
+            print self.sims
         l2_loss = tf.constant(0.0)
         # Make input for classification
-        self.new_input = tf.concat(1, [self.h_pool_left,self.h_pool_right], name='new_input')
+        self.new_input = tf.concat(1, [self.h_pool_left,self.sims,self.h_pool_right], name='new_input')
 
         with tf.name_scope('dropout'):
             self.h_drop = tf.nn.dropout(self.new_input, self.dropout_keep_prob,name = 'drop_out')
         if is_overlap:
             self.h_drop = tf.concat(1,[self.h_drop,self.overlap],name = 'new_input_overlap')
-            shape = [2 * num_filters_total + 2, 2]
+            shape = [2 * num_filters_total + 2 + 1, 2]
         else:
-            shape = [2 * num_filters_total, 2]
+            shape = [2 * num_filters_total + 1, 2]
         with tf.name_scope("output"):
             W = tf.get_variable(
                 "W_output",
@@ -119,4 +133,33 @@ class QA(object):
         with tf.name_scope("accuracy"):
             correct_predictions = tf.equal(self.predictions, tf.argmax(self.input_y, 1))
             self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy")
+if __name__ == '__main__':
+    cnn = QA(
+                max_len_left = 33,
+                max_len_right = 40,
+                vocab_size = 5000,
+                embedding_size = 100,
+                batch_size = 3,
+                embeddings = None,
+                dropout_keep_prob = 0.1,
+                filter_sizes = [3,4,5],
+                num_filters = 64,
+                l2_reg_lambda = 0.0,
+                is_Embedding_Needed = False,
+                trainable = True,
+                is_overlap = False)
+    input_x_1 = np.reshape(np.arange(3 * 33),[3,33])
+    input_x_2 = np.reshape(np.arange(3 * 40),[3,40])
+   
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        feed_dict = {
+            cnn.question:input_x_1,
+            cnn.answer:input_x_2
+
+        }
+       
+        question,answer,score = sess.run([cnn.question,cnn.answer,cnn.scores],feed_dict)
+        print question.shape,answer.shape
+        print score 
        

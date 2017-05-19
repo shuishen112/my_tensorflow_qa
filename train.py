@@ -48,7 +48,7 @@ tf.flags.DEFINE_float("l2_reg_lambda", 0.000001, "L2 regularizaion lambda (defau
 tf.flags.DEFINE_float("learning_rate", 1e-3, "learn rate( default: 0.0)")
 tf.flags.DEFINE_integer("max_len_left", 40, "max document length of left input")
 tf.flags.DEFINE_integer("max_len_right", 40, "max document length of right input")
-tf.flags.DEFINE_string("loss","pair_wise","loss function (default:point_wise)")
+tf.flags.DEFINE_string("loss","point_wise","loss function (default:point_wise)")
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
 tf.flags.DEFINE_boolean("trainable", True, "is embedding trainable? (default: False)")
@@ -59,7 +59,7 @@ tf.flags.DEFINE_boolean('overlap_needed',False,"is overlap used")
 tf.flags.DEFINE_boolean('dns','False','whether use dns or not')
 tf.flags.DEFINE_string('data','nlpcc','data set')
 tf.flags.DEFINE_string('CNN_type','apn','data set')
-tf.flags.DEFINE_float('sample_train',0.5,'sampe my train data')
+tf.flags.DEFINE_float('sample_train',1,'sampe my train data')
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
@@ -205,14 +205,14 @@ def test_point_wise():
 @log_time_delta
 def test_pair_wise(dns = FLAGS.dns):
     train,test,dev = load(FLAGS.data,filter = True)
-    train = sample_data(train,frac = FLAGS.sample_train)
-    test = sample_data(train,frac = FLAGS.sample_train)
-    dev = sample_data(dev,frac = FLAGS.sample_train)
+    # train = sample_data(train,frac = FLAGS.sample_train)
+    # test = sample_data(train,frac = FLAGS.sample_train)
+    # dev = sample_data(dev,frac = FLAGS.sample_train)
     # train = train[:1000]
     # test = test[:1000]
     # dev = dev[:1000]
-    q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
-    a_max_sent_length = 200#max(map(lambda x:len(x),train['answer'].str.split()))
+    q_max_sent_length = 20#max(map(lambda x:len(x),train['question'].str.split()))
+    a_max_sent_length = 40#max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
     print 'train question unique:{}'.format(len(train['question'].unique()))
     print 'train length',len(train)
@@ -270,7 +270,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 print map_mrr_test
             # seq_process(train, alphabet)
             # seq_process(test, alphabet)
-            map_max = 0.0
+            map_max = 0.65
             for i in range(1000):
                 if dns ==True:
                     samples = dns_sample(train,alphabet,q_max_sent_length,
@@ -296,13 +296,38 @@ def test_pair_wise(dns = FLAGS.dns):
                     time_str = datetime.datetime.now().isoformat()
                    
                     print("{}: step {}, loss {:g}, acc {:g} ,positive {:g},negative {:g}".format(time_str, step, loss, accuracy,np.mean(score12),np.mean(score13)))
+                    line = "{}: step {}, loss {:g}, acc {:g} ,positive {:g},negative {:g}".format(time_str, step, loss, accuracy,np.mean(score12),np.mean(score13))
                     # print loss
-                predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                map_mrr_train = evaluation.evaluationBypandas(train,predicted)
-                if (i + 1) % 5 == 0:
+                if i % 3 == 0:
+                    map_max = 0
                     predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                     map_mrr_test = evaluation.evaluationBypandas(test,predicted)
                     print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
+                    line = " {}:epoch: map_test{}".format(i,map_mrr_test[0])
+                    if map_mrr_test[0] > map_max:
+                        map_max = map_mrr_test[0]
+                        timeStamp = time.strftime("%Y%m%d%H%M%S", time.localtime(int(time.time())))
+                        folder = 'runs/' + timeDay
+                        out_dir = folder +'/'+timeStamp+'__'+FLAGS.data+str(map_mrr_test[0])
+                        if not os.path.exists(folder):
+                            os.makedirs(folder)
+                        save_path = saver.save(sess, out_dir)
+                        print "Model saved in file: ", save_path
+
+                '''
+                predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+                map_mrr_train = evaluation.evaluationBypandas(train,predicted)
+                predicted = predict(sess,cnn,dev,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+                map_mrr_dev = evaluation.evaluationBypandas(dev,predicted)
+                print "{}:epoch:train map mrr {}".format(i,map_mrr_train)
+                # print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
+                print "{}:epoch:dev map mrr {}".format(i,map_mrr_dev)
+                if map_mrr_dev[0] > map_max:
+                    map_max = map_mrr_dev[0]
+                    predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+                    map_mrr_test = evaluation.evaluationBypandas(test,predicted)
+                    print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
+                    line = " {}:epoch: map_test{}".format(i,map_mrr_test[0])
                     if map_mrr_test[0] > map_max:
                         timeStamp = time.strftime("%Y%m%d%H%M%S", time.localtime(int(time.time())))
                         folder = 'runs/' + timeDay
@@ -311,19 +336,16 @@ def test_pair_wise(dns = FLAGS.dns):
                             os.makedirs(folder)
                         save_path = saver.save(sess, out_dir)
                         print "Model saved in file: ", save_path
-                        map_max = map_mrr_test[0]
-                predicted = predict(sess,cnn,dev,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                map_mrr_dev = evaluation.evaluationBypandas(dev,predicted)
+                        
+                '''
                 # # predicted_train = prediction(sess,cnn,train,alphabet,q_max_sent_length,a_max_sent_length)
                 # map_mrr_dev = evaluation.evaluationBypandas(dev,predicted_dev[:,-1])
                 # map_mrr_test = evaluation.evaluationBypandas(test,predicted[:,-1])
                 # map_mrr_train = evaluation.evaluationBypandas(train,predicted_train[:,-1])
                 # # print evaluation.evaluationBypandas(train,predicted_train[:,-1])
-                print "{}:epoch:train map mrr {}".format(i,map_mrr_train)
-                # print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
-                print "{}:epoch:dev map mrr {}".format(i,map_mrr_dev)
+                
                 # line = " {}:epoch: map_train{}----map_test{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_test[0],map_mrr_dev[0])
-                line = " {}:epoch: map_train{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_dev[0])
+                # line = " {}:epoch: map_train{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_dev[0])
                 log.write(line + '\n')
                 log.flush()
                 
