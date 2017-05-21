@@ -44,7 +44,7 @@ class QA_CNN_extend(object):
                 print "random embedding"
                 W = tf.Variable(tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),name="W",trainable = trainable)
             self.embedding_W = W
-            self.overlap_W = tf.Variable(tf.random_uniform([3, self.extend_feature_dim], -1.0, 1.0),name="W",trainable = trainable)
+            self.overlap_W = tf.Variable(tf.random_uniform([3, self.extend_feature_dim], -1.0, 1.0),name="W",trainable = True)
             self.para.append(self.embedding_W)
             self.para.append(self.overlap_W)
         self.kernels = []

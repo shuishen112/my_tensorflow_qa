@@ -282,6 +282,16 @@ def overlap_index(question,answer,q_len,a_len,stopwords = []):
             value = 2
         a_index[i] = value
     return q_index,a_index
+def batch_gen(df,alphabet, batch_size = 10,q_len = 40,a_len = 40):
+    pairs=[]
+    for question in df["question"].unique():
+        group= df[df["question"]==question]
+        pos_answers = group[df["flag"]==1]["answer"]
+        neg_answers = group[df["flag"]==0]["answer"].reset_index()
+        question_indices = encode_to_split(question,alphabet,max_sentence = q_len)
+        for pos in pos_answers:
+            if len(neg_answers.index)>0:
+                neg_index=np.random.choice(neg_answers.index)
 @log_time_delta
 def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 40):
     pairs=[]
@@ -294,7 +304,7 @@ def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 
             if len(neg_answers.index)>0:
                 neg_index=np.random.choice(neg_answers.index)
 
-                neg= neg_answers.loc[neg_index,]["answer"]
+                neg = neg_answers.loc[neg_index,]["answer"]
                 q_pos_overlap,a_pos_overlap=overlap_index(question,pos,q_len,a_len)
                 
                 q_neg_overlap,a_neg_overlap=overlap_index(question,neg,q_len,a_len)
@@ -307,6 +317,23 @@ def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 
     for i in range(0,n_batches):
         batch = pairs[i*batch_size:(i+1) * batch_size]
         yield [[pair[i] for pair in batch]  for i in range(7)]
+def get_overlap_dict(df,alphabet,q_len = 40,a_len = 40):
+    d = dict()
+    for question in df['question'].unique():
+        group = df[df['question'] == question]
+        pos_answers = group[df["flag"]==1]["answer"]
+        neg_answers = group[df["flag"]==0]["answer"].reset_index()
+        for pos in pos_answers:
+            if len(neg_answers.index)>0:
+                neg_index = np.random.choice(neg_answers.index)
+
+                neg = neg_answers.loc[neg_index,]["answer"]
+                q_pos_overlap,a_pos_overlap = overlap_index(question,pos,q_len,a_len)
+                d[(question,pos)] = (q_pos_overlap,a_pos_overlap)
+                q_neg_overlap,a_neg_overlap = overlap_index(question,neg,q_len,a_len)
+                d[(question,neg)] = 
+
+
 def get_raw_pairs(df):
     pairs = []
     for question in df['question'].unique():
@@ -914,11 +941,14 @@ def sample_data(df,frac = 0.5):
     return df
 def replace_number(data):
     for df in data:
-        df['question'] = df['question'].str.replace(r'[A-Za-z]+','english')
-        df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','english')
+        df['question'] = df['question'].str.replace(r'[A-Za-z]+','[EN]')
+        df['question'] = df['question'].str.replace(r'[\d]+','[NUM]')
+        df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','[EN]')
+        df['answer'] = df['answer'].str.replace(r'[\d]+','[NUM]')
 if __name__ == '__main__':
-    data_processing()
-    # train,test,dev = load('nlpcc',filter = True)
+    # data_processing()
+    train,test,dev = load('nlpcc',filter = True)
+    train[train['flag'] == 1].to_csv('flag1.csv',index = False)
     # replace_number([train,test,dev])
     # print train
     # exit()

@@ -5,7 +5,7 @@ import numpy as np
 import os
 import time
 import datetime
-from data_helpers import sample_data,batch_gen_with_pair_overlap,batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,parseData,batch_gen_with_pair_whole
+from data_helpers import replace_number,sample_data,batch_gen_with_pair_overlap,batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,parseData,batch_gen_with_pair_whole
 import operator
 from QA_CNN_point_wise import QA
 from QA_CNN_pair_wise import QA_CNN
@@ -57,7 +57,7 @@ tf.flags.DEFINE_integer("evaluate_every", 500, "Evaluate model on dev set after 
 tf.flags.DEFINE_integer("checkpoint_every", 500, "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_boolean('overlap_needed',False,"is overlap used")
 tf.flags.DEFINE_boolean('dns','False','whether use dns or not')
-tf.flags.DEFINE_string('data','nlpcc','data set')
+tf.flags.DEFINE_string('data','wiki','data set')
 tf.flags.DEFINE_string('CNN_type','apn','data set')
 tf.flags.DEFINE_float('sample_train',1,'sampe my train data')
 # Misc Parameters
@@ -107,7 +107,7 @@ def prediction(sess,cnn,test,alphabet,q_len,a_len):
 
 @log_time_delta
 def test_point_wise():
-    train,test,dev = load("wiki",filter = True)
+    train,test,dev = load(FLAGS.data,filter = True)
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
     a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
     print 'train question unique:{}'.format(len(train['question'].unique()))
@@ -205,6 +205,7 @@ def test_point_wise():
 @log_time_delta
 def test_pair_wise(dns = FLAGS.dns):
     train,test,dev = load(FLAGS.data,filter = True)
+    replace_number([train,test,dev])
     # train = sample_data(train,frac = FLAGS.sample_train)
     # test = sample_data(train,frac = FLAGS.sample_train)
     # dev = sample_data(dev,frac = FLAGS.sample_train)
