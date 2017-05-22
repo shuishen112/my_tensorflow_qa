@@ -291,10 +291,17 @@ def batch_gen(df,alphabet, batch_size = 10,q_len = 40,a_len = 40):
         question_indices = encode_to_split(question,alphabet,max_sentence = q_len)
         for pos in pos_answers:
             if len(neg_answers.index)>0:
-                neg_index=np.random.choice(neg_answers.index)
+                    neg_index=np.random.choice(neg_answers.index)
 @log_time_delta
-def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 40):
+def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 40,fresh = True):
     pairs=[]
+    file = 'model/overlap.dict'
+    if os.path.exists(file) and not fresh:
+        print 'load overlap'
+        d = pickle.load(open(file,'r'))
+    else:
+        print 'calculate overlap '
+        d = get_overlap_dict(df,alphabet,q_len,a_len)
     for question in df["question"].unique():
         group= df[df["question"]==question]
         pos_answers = group[df["flag"]==1]["answer"]
@@ -305,9 +312,11 @@ def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 
                 neg_index=np.random.choice(neg_answers.index)
 
                 neg = neg_answers.loc[neg_index,]["answer"]
-                q_pos_overlap,a_pos_overlap=overlap_index(question,pos,q_len,a_len)
+                # q_pos_overlap,a_pos_overlap=overlap_index(question,pos,q_len,a_len)
                 
-                q_neg_overlap,a_neg_overlap=overlap_index(question,neg,q_len,a_len)
+                # q_neg_overlap,a_neg_overlap=overlap_index(question,neg,q_len,a_len)
+                q_pos_overlap,a_pos_overlap = d[(question,pos)]
+                q_neg_overlap,a_neg_overlap = d[(question,neg)]
                 pairs.append((question_indices,encode_to_split(pos,alphabet,max_sentence = a_len),encode_to_split(neg,alphabet,max_sentence = a_len),q_pos_overlap,q_neg_overlap,a_pos_overlap,a_neg_overlap))
     print 'pairs:{}'.format(len(pairs))
     # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
@@ -322,30 +331,16 @@ def get_overlap_dict(df,alphabet,q_len = 40,a_len = 40):
     for question in df['question'].unique():
         group = df[df['question'] == question]
         pos_answers = group[df["flag"]==1]["answer"]
-        neg_answers = group[df["flag"]==0]["answer"].reset_index()
+        neg_answers = group[df["flag"]==0]["answer"]
         for pos in pos_answers:
-            if len(neg_answers.index)>0:
-                neg_index = np.random.choice(neg_answers.index)
-
-                neg = neg_answers.loc[neg_index,]["answer"]
+            for neg in neg_answers:
                 q_pos_overlap,a_pos_overlap = overlap_index(question,pos,q_len,a_len)
                 d[(question,pos)] = (q_pos_overlap,a_pos_overlap)
                 q_neg_overlap,a_neg_overlap = overlap_index(question,neg,q_len,a_len)
-                d[(question,neg)] = 
-
-
-def get_raw_pairs(df):
-    pairs = []
-    for question in df['question'].unique():
-        group = df[df['question'] == question]
-        pos_answers = group[df['flag'] == 1]['answer']
-        neg_answers = group[df['flag'] == 0]['answer'].reset_index()
-        for pos in pos_answers:
-            if len(neg_answers.index) > 0:
-                neg_index = np.random.choice(neg_answers.index)
-                neg = neg_answers.loc[neg_index]['answer']
-                pairs.append((question,pos,neg))
-    return pairs
+                d[(question,neg)] = (q_neg_overlap,a_neg_overlap)
+    file = 'model/overlap.dict'
+    pickle.dump(d,open(file,'w'))
+    return d
 def batch_gen_with_overlap(df,alphabet,batch_size = 10,qlen = 40,a_len = 40):
     pairs = get_raw_pairs(df)
     overlap = []
@@ -947,13 +942,14 @@ def replace_number(data):
         df['answer'] = df['answer'].str.replace(r'[\d]+','[NUM]')
 if __name__ == '__main__':
     # data_processing()
-    train,test,dev = load('nlpcc',filter = True)
-    train[train['flag'] == 1].to_csv('flag1.csv',index = False)
+    train,test,dev = load('wiki',filter = True)
+    # train[train['flag'] == 1].to_csv('flag1.csv',index = False)
     # replace_number([train,test,dev])
     # print train
     # exit()
-    # # alphabet,embeddings = prepare([train,test,dev],dim = 300,is_embedding_needed = True,fresh = True)
-    # print len(alphabet)
+    alphabet,embeddings = prepare([train,test,dev],dim = 300,is_embedding_needed = True,fresh = False)
+    print len(alphabet)
+    get_overlap_dict(train,alphabet)
     # file = open('word_wiki.txt','w')
     # for w in alphabet:
     #     file.write(w + '\n')

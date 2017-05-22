@@ -48,7 +48,7 @@ tf.flags.DEFINE_float("l2_reg_lambda", 0.000001, "L2 regularizaion lambda (defau
 tf.flags.DEFINE_float("learning_rate", 1e-3, "learn rate( default: 0.0)")
 tf.flags.DEFINE_integer("max_len_left", 40, "max document length of left input")
 tf.flags.DEFINE_integer("max_len_right", 40, "max document length of right input")
-tf.flags.DEFINE_string("loss","point_wise","loss function (default:point_wise)")
+tf.flags.DEFINE_string("loss","pair_wise","loss function (default:point_wise)")
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
 tf.flags.DEFINE_boolean("trainable", True, "is embedding trainable? (default: False)")
@@ -60,6 +60,7 @@ tf.flags.DEFINE_boolean('dns','False','whether use dns or not')
 tf.flags.DEFINE_string('data','wiki','data set')
 tf.flags.DEFINE_string('CNN_type','apn','data set')
 tf.flags.DEFINE_float('sample_train',1,'sampe my train data')
+tf.flags.DEFINE_boolean('fresh',False,'wheather recalculate the embedding or overlap default is True')
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
@@ -205,7 +206,7 @@ def test_point_wise():
 @log_time_delta
 def test_pair_wise(dns = FLAGS.dns):
     train,test,dev = load(FLAGS.data,filter = True)
-    replace_number([train,test,dev])
+    # replace_number([train,test,dev])
     # train = sample_data(train,frac = FLAGS.sample_train)
     # test = sample_data(train,frac = FLAGS.sample_train)
     # dev = sample_data(dev,frac = FLAGS.sample_train)
@@ -219,7 +220,7 @@ def test_pair_wise(dns = FLAGS.dns):
     print 'train length',len(train)
     print 'test length', len(test)
     print 'dev length', len(dev)
-    alphabet,embeddings = prepare([train,test,dev],dim = FLAGS.embedding_dim,is_embedding_needed = True,fresh = True)
+    alphabet,embeddings = prepare([train,test,dev],dim = FLAGS.embedding_dim,is_embedding_needed = True,fresh = FLAGS.fresh)
     # alphabet,embeddings = prepare_300([train,test,dev])
     print 'alphabet:',len(alphabet)
 
@@ -279,7 +280,7 @@ def test_pair_wise(dns = FLAGS.dns):
                     datas = batch_gen_with_pair_dns(samples,FLAGS.batch_size)
                 else:
                     datas = batch_gen_with_pair_overlap(train,alphabet,FLAGS.batch_size,
-                        q_len = q_max_sent_length,a_len = a_max_sent_length)        
+                        q_len = q_max_sent_length,a_len = a_max_sent_length,fresh = FLAGS.fresh)        
                 print "load data"
                 for data in datas:
                     feed_dict = {
@@ -300,7 +301,6 @@ def test_pair_wise(dns = FLAGS.dns):
                     line = "{}: step {}, loss {:g}, acc {:g} ,positive {:g},negative {:g}".format(time_str, step, loss, accuracy,np.mean(score12),np.mean(score13))
                     # print loss
                 if i % 3 == 0:
-                    map_max = 0
                     predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                     map_mrr_test = evaluation.evaluationBypandas(test,predicted)
                     print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
