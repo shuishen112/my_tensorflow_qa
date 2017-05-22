@@ -535,7 +535,7 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
                     embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
                     sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             else:
-                fname = 'model/dbqa.word2vec'
+                fname = 'model/wiki.ch.text.vector'
                 embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
                 sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             pickle.dump(sub_embeddings,open(sub_vec_file,'w'))
@@ -943,6 +943,7 @@ def replace_number(data):
 if __name__ == '__main__':
     # data_processing()
     train,test,dev = load('wiki',filter = True)
+    
     # train[train['flag'] == 1].to_csv('flag1.csv',index = False)
     # replace_number([train,test,dev])
     # print train
