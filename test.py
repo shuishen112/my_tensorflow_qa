@@ -60,7 +60,7 @@ def testReshape():
 		print b.eval()
 def testDropout():
 	a = tf.Variable(tf.random_uniform([10,10],-1,1),name = 'a')
-	a_drop = tf.nn.dropout(a,keep_prob = 0.5)
+	a_drop = tf.nn.dropout(a,keep_prob = 1)
 	with tf.Session() as sess:
 		sess.run(tf.global_variables_initializer())
 		print sess.run(a_drop)
@@ -260,6 +260,20 @@ def test_similarity():
 	with tf.Session() as sess:
 		sess.run(tf.global_variables_initializer())
 		print sess.run(left)
+def seefile():
+	file = 'missword'
+	import pandas as pd
+	import pynlpir
+	pynlpir.open()
+	df = pd.read_csv(file,header = None,names = ['word'])
+	number = r'\d+'
+	df = df[df['word'].str.contains(number) == False]
+	english = r'^[A-Za-z]+$'
+	# df[df['word'].str.contains(number) == False].to_csv('unknow')
+	word = df[df['word'].str.contains(english) == False]
+	for w in word['word']:
+		print '#'.join(pynlpir.segment(w,pos_tagging = False))
+	# print df
 if __name__ == '__main__':
 	# test_log()
 	# mygenerator = (x*x for x in range(3))
@@ -267,15 +281,20 @@ if __name__ == '__main__':
 	# 	print i
 	# for i in mygenerator:
 	# 	print i
-
-	def createGenerator():
-		mylist = range(3)
-		for i in mylist:
-			yield i * i,i * i * i
-	for j in range(5):
-		mygenerator = createGenerator()
-		for i in mygenerator:
-			print i
+	# a = [[1,2,3],[4,5,6],[7,8,9]]
+	# import itertools
+	# merged = list(itertools.chain(*a))
+	# print merged
+	testDropout()
+	# seefile()
+	# def createGenerator():
+	# 	mylist = range(3)
+	# 	for i in mylist:
+	# 		yield i * i,i * i * i
+	# for j in range(5):
+	# 	mygenerator = createGenerator()
+	# 	for i in mygenerator:
+	# 		print i
 	# a = np.arange(100,200)
 	# a = map(str,a)
 	# index = np.random.choice(a,size = [30])

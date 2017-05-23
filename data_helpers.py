@@ -295,28 +295,28 @@ def batch_gen(df,alphabet, batch_size = 10,q_len = 40,a_len = 40):
 @log_time_delta
 def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 40,fresh = True):
     pairs=[]
-    file = 'model/overlap.dict'
-    if os.path.exists(file) and not fresh:
-        print 'load overlap'
-        d = pickle.load(open(file,'r'))
-    else:
-        print 'calculate overlap '
-        d = get_overlap_dict(df,alphabet,q_len,a_len)
+    # file = 'model/overlap.dict'
+    # if os.path.exists(file):
+    #     print 'load overlap'
+    #     d = pickle.load(open(file,'r'))
+    # else:
+    #     print 'calculate overlap'
+    #     d = get_overlap_dict(df,alphabet,q_len,a_len)
     for question in df["question"].unique():
         group= df[df["question"]==question]
         pos_answers = group[df["flag"]==1]["answer"]
         neg_answers = group[df["flag"]==0]["answer"].reset_index()
         question_indices = encode_to_split(question,alphabet,max_sentence = q_len)
         for pos in pos_answers:
-            if len(neg_answers.index)>0:
+            if len(neg_answers.index) > 0:
                 neg_index=np.random.choice(neg_answers.index)
 
                 neg = neg_answers.loc[neg_index,]["answer"]
-                # q_pos_overlap,a_pos_overlap=overlap_index(question,pos,q_len,a_len)
+                q_pos_overlap,a_pos_overlap=overlap_index(question,pos,q_len,a_len)
                 
-                # q_neg_overlap,a_neg_overlap=overlap_index(question,neg,q_len,a_len)
-                q_pos_overlap,a_pos_overlap = d[(question,pos)]
-                q_neg_overlap,a_neg_overlap = d[(question,neg)]
+                q_neg_overlap,a_neg_overlap=overlap_index(question,neg,q_len,a_len)
+                # q_pos_overlap,a_pos_overlap = d[(question,pos)]
+                # q_neg_overlap,a_neg_overlap = d[(question,neg)]
                 pairs.append((question_indices,encode_to_split(pos,alphabet,max_sentence = a_len),encode_to_split(neg,alphabet,max_sentence = a_len),q_pos_overlap,q_neg_overlap,a_pos_overlap,a_neg_overlap))
     print 'pairs:{}'.format(len(pairs))
     # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
@@ -463,13 +463,19 @@ def sentence_index(sen, alphabet, input_lens):
 
 
 def getSubVectorsFromDict(vectors,vocab,dim = 300):
+    file = open('missword','w')
     embedding = np.zeros((len(vocab),dim))
+    count = 1
     for word in vocab:
+        count += 1
+        if count % 100 == 0:
+            print count
         if word in vectors:
             embedding[vocab[word]]= vectors[word]
         else:
+            file.write(word + '\n')
             embedding[vocab[word]]= np.random.uniform(-0.25,0.25,dim) #.tolist()
-
+    file.close()
     return embedding
 def getSubVectors(vectors,vocab,dim = 50):
     print 'embedding_size:',vectors.syn0.shape[1]
@@ -485,13 +491,30 @@ def cut(sentence,isEnglish = isEnglish):
         tokens = sentence.lower().split()
     else:
         stopwords = { word.decode("utf-8") for word in open("model/chStopWordsSimple.txt").read().split()}
-
         # words = jieba.cut(str(sentence))
         tokens = [word for word in sentence.split() if word not in stopwords]
     return tokens
+class Seq_gener(object):
+    def __init__(self,alphabet,max_lenght):
+        self.alphabet = alphabet
+        self.max_lenght = max_lenght
+    def __call__(self, text):
+        return ([ self.alphabet[str(word)] for word in text.lower().split() ]  +[self.alphabet["END"]] *(self.max_lenght-len(text.split())))[:self.max_lenght]
+
+def getQAIndiceofTest(df,alphabet,max_lenght=50):
+    gen_seq =lambda text: ([ alphabet[str(word)] for word in text.lower().split() ]  +[alphabet["END"]] *(max_lenght-len(text.split())))[:max_lenght]
+    # gen_seq =lambda text: " ".join([ str(alphabet[str(word)]) for word in text.split() +[] *(maxlen- len(text.split())) ] )
+    # questions= np.array(map(gen_seq,df["question"]))
+    # answers= np.array(map( gen_seq,df["answer"]))
+    pool = multiprocessing.Pool(cores)
+    questions = pool.map(Seq_gener(alphabet,max_lenght),df["question"])
+    answers = pool.map(Seq_gener(alphabet,max_lenght),df["answer"])
+    return [np.array(questions),np.array(answers)]
 @log_time_delta
 def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
     vocab_file = 'model/voc'
+    import itertools
+    
     if os.path.exists(vocab_file) and not fresh:
         alphabet = pickle.load(open(vocab_file,'r'))
     else:   
@@ -501,24 +524,31 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
         count = 0
         for corpus in cropuses:
             for texts in [corpus["question"].unique(),corpus["answer"]]:
-                for sentence in texts:   
-                    count += 1
-                    if count % 10000 == 0:
-                        print count
-                    tokens = cut(sentence)
-                    # print "#".join(tokens)
-                    for token in tokens:
-                        if is_stemmed_needed:
-                            # try:
-                            alphabet.add(stemmer.stem(token.decode('utf-8')))
-                            # except Exception as e:
-                            #     alphabet.add(token)
-                            #     print type(e)
+                pool = multiprocessing.Pool(cores)
+                # pool.map(add_to_alphabet,texts,alphabet)
+                tokens = pool.map(cut,texts)
+                merged = list(itertools.chain(*tokens))
+                print 'tokens',len(merged)
+                for token in set(merged):
+                    alphabet.add(token)
+                # for sentence in texts:   
+                #     count += 1
+                #     if count % 10000 == 0:
+                #         print count
+                #     tokens = cut(sentence)
+                #     # print "#".join(tokens)
+                #     for token in set(tokens):
+                #         if is_stemmed_needed:
+                #             # try:
+                #             alphabet.add(stemmer.stem(token.decode('utf-8')))
+                #             # except Exception as e:
+                #             #     alphabet.add(token)
+                #             #     print type(e)
                             
-                        else:
+                #         else:
 
-                            alphabet.add(token)
-        print 'count sentence',count
+                #             alphabet.add(token)
+        print len(alphabet.keys())
         pickle.dump(alphabet,open(vocab_file,'w'))
     if is_embedding_needed:
         sub_vec_file = 'embedding/sub_vector'
@@ -555,22 +585,6 @@ def seq_process(df,alphabet):
     df["answer_seq"]= df["answer"].apply( gen_seq)
 def gen_seq_fun(text,alphabet):
     return ([ alphabet[str(word)] for word in text.lower().split() ]  +[alphabet["END"]] *(max_lenght-len(text.split())))[:max_lenght]
-class Seq_gener(object):
-    def __init__(self,alphabet,max_lenght):
-        self.alphabet = alphabet
-        self.max_lenght = max_lenght
-    def __call__(self, text):
-        return ([ self.alphabet[str(word)] for word in text.lower().split() ]  +[self.alphabet["END"]] *(self.max_lenght-len(text.split())))[:self.max_lenght]
-
-def getQAIndiceofTest(df,alphabet,max_lenght=50):
-    gen_seq =lambda text: ([ alphabet[str(word)] for word in text.lower().split() ]  +[alphabet["END"]] *(max_lenght-len(text.split())))[:max_lenght]
-    # gen_seq =lambda text: " ".join([ str(alphabet[str(word)]) for word in text.split() +[] *(maxlen- len(text.split())) ] )
-    # questions= np.array(map(gen_seq,df["question"]))
-    # answers= np.array(map( gen_seq,df["answer"]))
-    pool = multiprocessing.Pool(cores)
-    questions = pool.map(Seq_gener(alphabet,max_lenght),df["question"])
-    answers = pool.map(Seq_gener(alphabet,max_lenght),df["answer"])
-    return [np.array(questions),np.array(answers)]
 def getDataFolexdecomp():
     train,test,dev = load("trec",filter=True)
     alphabet,embeddings = prepare([train,test,dev],is_embedding_needed = True)
@@ -936,21 +950,21 @@ def sample_data(df,frac = 0.5):
     return df
 def replace_number(data):
     for df in data:
-        df['question'] = df['question'].str.replace(r'[A-Za-z]+','[EN]')
-        df['question'] = df['question'].str.replace(r'[\d]+','[NUM]')
-        df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','[EN]')
-        df['answer'] = df['answer'].str.replace(r'[\d]+','[NUM]')
+        df['question'] = df['question'].str.replace(r'[A-Za-z]+','')
+        df['question'] = df['question'].str.replace(r'[\d]+','')
+        df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','')
+        df['answer'] = df['answer'].str.replace(r'[\d]+','')
 if __name__ == '__main__':
     # data_processing()
-    train,test,dev = load('wiki',filter = True)
-    
-    # train[train['flag'] == 1].to_csv('flag1.csv',index = False)
-    # replace_number([train,test,dev])
-    # print train
-    # exit()
-    alphabet,embeddings = prepare([train,test,dev],dim = 300,is_embedding_needed = True,fresh = False)
-    print len(alphabet)
-    get_overlap_dict(train,alphabet)
+    train,test,dev = load('nlpcc',filter = False)
+    replace_number([train,test,dev])
+    print train
+    # train = train[:1000]
+    # test = test[:1000]
+    # dev = dev[:1000]
+    # alphabet,embeddings = prepare([train,test,dev],dim = 300,is_embedding_needed = True,fresh = True)
+    # print len(alphabet)
+    # get_overlap_dict(train,alphabet)
     # file = open('word_wiki.txt','w')
     # for w in alphabet:
     #     file.write(w + '\n')
