@@ -533,30 +533,30 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
         count = 0
         for corpus in cropuses:
             for texts in [corpus["question"].unique(),corpus["answer"]]:
-                pool = multiprocessing.Pool(cores)
-                # pool.map(add_to_alphabet,texts,alphabet)
-                tokens = pool.map(cut,texts)
-                merged = list(itertools.chain(*tokens))
-                print 'tokens',len(merged)
-                for token in set(merged):
-                    alphabet.add(token)
-                # for sentence in texts:   
-                #     count += 1
-                #     if count % 10000 == 0:
-                #         print count
-                #     tokens = cut(sentence)
-                #     # print "#".join(tokens)
-                #     for token in set(tokens):
-                #         if is_stemmed_needed:
-                #             # try:
-                #             alphabet.add(stemmer.stem(token.decode('utf-8')))
-                #             # except Exception as e:
-                #             #     alphabet.add(token)
-                #             #     print type(e)
+                # pool = multiprocessing.Pool(cores)
+                # # pool.map(add_to_alphabet,texts,alphabet)
+                # tokens = pool.map(cut,texts)
+                # merged = list(itertools.chain(*tokens))
+                # print 'tokens',len(merged)
+                # for token in set(merged):
+                #     alphabet.add(token)
+                for sentence in texts:   
+                    count += 1
+                    if count % 10000 == 0:
+                        print count
+                    tokens = cut(sentence)
+                    # print "#".join(tokens)
+                    for token in set(tokens):
+                        if is_stemmed_needed:
+                            # try:
+                            alphabet.add(stemmer.stem(token.decode('utf-8')))
+                            # except Exception as e:
+                            #     alphabet.add(token)
+                            #     print type(e)
                             
-                #         else:
+                        else:
 
-                #             alphabet.add(token)
+                            alphabet.add(token)
         print len(alphabet.keys())
         pickle.dump(alphabet,open(vocab_file,'w'))
     if is_embedding_needed:
@@ -960,13 +960,18 @@ def sample_data(df,frac = 0.5):
     return df
 def replace_number(data):
     for df in data:
-        # df['question'] = df['question'].str.replace(r'[A-Za-z]+','')
-        df['question'] = df['question'].str.replace(r'[\d]+','[NUM]')
-        # df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','')
-        df['answer'] = df['answer'].str.replace(r'[\d]+','[NUM]')
+        df['question'] = df['question'].str.replace(r'[A-Za-z]+','')
+        # df['question'] = df['question'].str.replace(r'[\d]+','')
+        df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','')
+        # df['answer'] = df['answer'].str.replace(r'[\d]+','')
 if __name__ == '__main__':
     # data_processing()
     train,test,dev = load('nlpcc',filter = False)
+    # true_answer = test[test['flag'] == 1]['answer']
+    # print true_answer[true_answer.str.len() > 100].to_csv();
+    replace_number([train,test,dev])
+    test[test['flag'] == 1].to_csv('test_flag1',header = None)
+    exit()
     # train[train['flag'] == 1].to_csv('flag1')
     replace_number([train,test,dev])
     # data_processing()

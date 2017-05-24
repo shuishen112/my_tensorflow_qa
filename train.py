@@ -211,9 +211,9 @@ def test_pair_wise(dns = FLAGS.dns):
     # train = sample_data(train,frac = FLAGS.sample_train)
     # test = sample_data(train,frac = FLAGS.sample_train)
     # dev = sample_data(dev,frac = FLAGS.sample_train)
-    train = train[:1000]
-    test = test[:1000]
-    dev = dev[:1000]
+    # train = train[:1000]
+    # test = test[:1000]
+    # dev = dev[:1000]
     q_max_sent_length = 25#max(map(lambda x:len(x),train['question'].str.split()))
     a_max_sent_length = 75#max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
