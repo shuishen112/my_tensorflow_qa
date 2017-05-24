@@ -285,7 +285,12 @@ if __name__ == '__main__':
 	# import itertools
 	# merged = list(itertools.chain(*a))
 	# print merged
-	testDropout()
+	a = None
+	if a :
+		print 'hello'
+	else:
+		print 'world'
+	# testDropout()
 	# seefile()
 	# def createGenerator():
 	# 	mylist = range(3)

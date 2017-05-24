@@ -168,12 +168,15 @@ def transform(flag):
     else:
         return [1,0]
 @log_time_delta
-def batch_gen_with_single(df,alphabet,batch_size = 10,q_len = 33,a_len = 40):
+def batch_gen_with_single(df,alphabet,batch_size = 10,q_len = 33,a_len = 40,overlap_dict = None):
     pairs=[]
     for index,row in df.iterrows():
         quetion = encode_to_split(row["question"],alphabet,max_sentence = q_len)
         answer = encode_to_split(row["answer"],alphabet,max_sentence = a_len)
-        q_pos_overlap,a_pos_overlap = overlap_index(row["question"],row["answer"],q_len,a_len)
+        if overlap_dict:
+            q_pos_overlap,a_pos_overlap = overlap_index(row["question"],row["answer"],q_len,a_len)
+        else:
+            q_pos_overlap,a_pos_overlap = overlap_dict[(row["question"],row["answer"])]
         pairs.append((quetion,answer,q_pos_overlap,a_pos_overlap))
     # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
     n_batches = int(len(pairs)*1.0/batch_size)
@@ -293,7 +296,7 @@ def batch_gen(df,alphabet, batch_size = 10,q_len = 40,a_len = 40):
             if len(neg_answers.index)>0:
                     neg_index=np.random.choice(neg_answers.index)
 @log_time_delta
-def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 40,fresh = True):
+def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 40,fresh = True,overlap_dict = None):
     pairs=[]
     # file = 'model/overlap.dict'
     # if os.path.exists(file):
@@ -302,23 +305,27 @@ def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 
     # else:
     #     print 'calculate overlap'
     #     d = get_overlap_dict(df,alphabet,q_len,a_len)
+    start = time.time()
     for question in df["question"].unique():
         group= df[df["question"]==question]
-        pos_answers = group[df["flag"]==1]["answer"]
-        neg_answers = group[df["flag"]==0]["answer"].reset_index()
+        pos_answers = group[df["flag"] == 1]["answer"]
+        neg_answers = group[df["flag"] == 0]["answer"].reset_index()
         question_indices = encode_to_split(question,alphabet,max_sentence = q_len)
         for pos in pos_answers:
             if len(neg_answers.index) > 0:
                 neg_index=np.random.choice(neg_answers.index)
-
                 neg = neg_answers.loc[neg_index,]["answer"]
-                q_pos_overlap,a_pos_overlap=overlap_index(question,pos,q_len,a_len)
-                
-                q_neg_overlap,a_neg_overlap=overlap_index(question,neg,q_len,a_len)
-                # q_pos_overlap,a_pos_overlap = d[(question,pos)]
-                # q_neg_overlap,a_neg_overlap = d[(question,neg)]
+                if overlap_dict:
+                    q_pos_overlap,a_pos_overlap = overlap_index(question,pos,q_len,a_len)                   
+                    q_neg_overlap,a_neg_overlap = overlap_index(question,neg,q_len,a_len)
+                else:  
+                    q_pos_overlap,a_pos_overlap = overlap_dict[(question,pos)]
+                    q_neg_overlap,a_neg_overlap = overlap_dict[(question,neg)]
                 pairs.append((question_indices,encode_to_split(pos,alphabet,max_sentence = a_len),encode_to_split(neg,alphabet,max_sentence = a_len),q_pos_overlap,q_neg_overlap,a_pos_overlap,a_neg_overlap))
     print 'pairs:{}'.format(len(pairs))
+    end = time.time()
+    delta = end - start
+    print( "batch_gen_with_pair_overlap_runed %.2f seconds" % (delta))
     # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
     n_batches= int(len(pairs)*1.0/batch_size)
     pairs = sklearn.utils.shuffle(pairs,random_state =132)
@@ -326,6 +333,7 @@ def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 
     for i in range(0,n_batches):
         batch = pairs[i*batch_size:(i+1) * batch_size]
         yield [[pair[i] for pair in batch]  for i in range(7)]
+@log_time_delta
 def get_overlap_dict(df,alphabet,q_len = 40,a_len = 40):
     d = dict()
     for question in df['question'].unique():
@@ -338,8 +346,6 @@ def get_overlap_dict(df,alphabet,q_len = 40,a_len = 40):
                 d[(question,pos)] = (q_pos_overlap,a_pos_overlap)
                 q_neg_overlap,a_neg_overlap = overlap_index(question,neg,q_len,a_len)
                 d[(question,neg)] = (q_neg_overlap,a_neg_overlap)
-    file = 'model/overlap.dict'
-    pickle.dump(d,open(file,'w'))
     return d
 def batch_gen_with_overlap(df,alphabet,batch_size = 10,qlen = 40,a_len = 40):
     pairs = get_raw_pairs(df)
@@ -467,15 +473,15 @@ def getSubVectorsFromDict(vectors,vocab,dim = 300):
     embedding = np.zeros((len(vocab),dim))
     count = 1
     for word in vocab:
-        count += 1
-        if count % 100 == 0:
-            print count
+        
         if word in vectors:
+            count += 1
             embedding[vocab[word]]= vectors[word]
         else:
             file.write(word + '\n')
             embedding[vocab[word]]= np.random.uniform(-0.25,0.25,dim) #.tolist()
     file.close()
+    print 'word in embedding',count
     return embedding
 def getSubVectors(vectors,vocab,dim = 50):
     print 'embedding_size:',vectors.syn0.shape[1]
@@ -771,6 +777,7 @@ def loadData(dataset = dataset):
 
 def data_processing():
     train,test,dev = load('nlpcc',filter = True)
+    replace_number([train,test,dev])
     q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
     a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
     q_len = map(lambda x:len(x),train['question'].str.split())
@@ -958,6 +965,7 @@ if __name__ == '__main__':
     # data_processing()
     train,test,dev = load('nlpcc',filter = False)
     replace_number([train,test,dev])
+    data_processing()
     print train
     # train = train[:1000]
     # test = test[:1000]

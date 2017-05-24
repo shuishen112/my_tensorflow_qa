@@ -5,7 +5,7 @@ import numpy as np
 import os
 import time
 import datetime
-from data_helpers import replace_number,sample_data,batch_gen_with_pair_overlap,batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,parseData,batch_gen_with_pair_whole
+from data_helpers import get_overlap_dict,replace_number,sample_data,batch_gen_with_pair_overlap,batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,parseData,batch_gen_with_pair_whole
 import operator
 from QA_CNN_point_wise import QA
 from QA_CNN_pair_wise import QA_CNN
@@ -78,7 +78,8 @@ precision = data_file + 'precise'
 @log_time_delta
 def predict(sess,cnn,test,alphabet,batch_size,q_len,a_len):
     scores = []
-    for data in batch_gen_with_single(test,alphabet,batch_size,q_len,a_len): 
+    d = get_overlap_dict(test,alphabet,q_len,a_len)
+    for data in batch_gen_with_single(test,alphabet,batch_size,q_len,a_len,overlap_dict = d): 
         if FLAGS.loss ==  'point_wise':
             feed_dict = {
                 cnn.question: data[0],
@@ -213,8 +214,8 @@ def test_pair_wise(dns = FLAGS.dns):
     # train = train[:1000]
     # test = test[:1000]
     # dev = dev[:1000]
-    q_max_sent_length = 20#max(map(lambda x:len(x),train['question'].str.split()))
-    a_max_sent_length = 40#max(map(lambda x:len(x),train['answer'].str.split()))
+    q_max_sent_length = 25#max(map(lambda x:len(x),train['question'].str.split()))
+    a_max_sent_length = 75#max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
     print 'train question unique:{}'.format(len(train['question'].unique()))
     print 'train length',len(train)
@@ -279,8 +280,9 @@ def test_pair_wise(dns = FLAGS.dns):
                         a_max_sent_length,sess,cnn,FLAGS.batch_size,neg_sample_num = 10)
                     datas = batch_gen_with_pair_dns(samples,FLAGS.batch_size)
                 else:
+                    d = get_overlap_dict(train,alphabet,q_len = q_max_sent_length,a_len = a_max_sent_length)
                     datas = batch_gen_with_pair_overlap(train,alphabet,FLAGS.batch_size,
-                        q_len = q_max_sent_length,a_len = a_max_sent_length,fresh = FLAGS.fresh)        
+                        q_len = q_max_sent_length,a_len = a_max_sent_length,fresh = FLAGS.fresh,overlap_dict = d)        
                 print "load data"
                 for data in datas:
                     feed_dict = {
@@ -300,7 +302,7 @@ def test_pair_wise(dns = FLAGS.dns):
                     print("{}: step {}, loss {:g}, acc {:g} ,positive {:g},negative {:g}".format(time_str, step, loss, accuracy,np.mean(score12),np.mean(score13)))
                     line = "{}: step {}, loss {:g}, acc {:g} ,positive {:g},negative {:g}".format(time_str, step, loss, accuracy,np.mean(score12),np.mean(score13))
                     # print loss
-                if i % 3 == 0:
+                if i % 1 == 0:
                     predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                     map_mrr_test = evaluation.evaluationBypandas(test,predicted)
                     print "{}:epoch:test map mrr {}".format(i,map_mrr_test)
