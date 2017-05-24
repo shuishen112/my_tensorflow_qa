@@ -22,8 +22,8 @@ cores = multiprocessing.cpu_count()
 dataset= "wiki"
 UNKNOWN_WORD_IDX = 0
 is_stemmed_needed = False
-
-
+stopwords = { word.decode("utf-8") for word in open("model/chStopWordsSimple.txt").read().split()}
+names = {word for word in open('names.txt').read().split()}
 
 from functools import wraps
 #print( tf.__version__)
@@ -333,6 +333,7 @@ def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 
     for i in range(0,n_batches):
         batch = pairs[i*batch_size:(i+1) * batch_size]
         yield [[pair[i] for pair in batch]  for i in range(7)]
+
 @log_time_delta
 def get_overlap_dict(df,alphabet,q_len = 40,a_len = 40):
     d = dict()
@@ -478,8 +479,11 @@ def getSubVectorsFromDict(vectors,vocab,dim = 300):
             count += 1
             embedding[vocab[word]]= vectors[word]
         else:
-            file.write(word + '\n')
-            embedding[vocab[word]]= np.random.uniform(-0.25,0.25,dim) #.tolist()
+            if word in names:
+                embedding[vocab[word]] = vectors['谁']
+            else:
+                file.write(word + '\n')
+                embedding[vocab[word]]= np.random.uniform(-0.25,0.25,dim) #.tolist()
     file.close()
     print 'word in embedding',count
     return embedding
@@ -496,7 +500,6 @@ def cut(sentence,isEnglish = isEnglish):
     if isEnglish:
         tokens = sentence.lower().split()
     else:
-        stopwords = { word.decode("utf-8") for word in open("model/chStopWordsSimple.txt").read().split()}
         # words = jieba.cut(str(sentence))
         tokens = [word for word in sentence.split() if word not in stopwords]
     return tokens
@@ -957,21 +960,22 @@ def sample_data(df,frac = 0.5):
     return df
 def replace_number(data):
     for df in data:
-        df['question'] = df['question'].str.replace(r'[A-Za-z]+','')
-        df['question'] = df['question'].str.replace(r'[\d]+','')
-        df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','')
-        df['answer'] = df['answer'].str.replace(r'[\d]+','')
+        # df['question'] = df['question'].str.replace(r'[A-Za-z]+','')
+        df['question'] = df['question'].str.replace(r'[\d]+','[NUM]')
+        # df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','')
+        df['answer'] = df['answer'].str.replace(r'[\d]+','[NUM]')
 if __name__ == '__main__':
     # data_processing()
     train,test,dev = load('nlpcc',filter = False)
+    # train[train['flag'] == 1].to_csv('flag1')
     replace_number([train,test,dev])
-    data_processing()
+    # data_processing()
     print train
-    # train = train[:1000]
-    # test = test[:1000]
-    # dev = dev[:1000]
-    # alphabet,embeddings = prepare([train,test,dev],dim = 300,is_embedding_needed = True,fresh = True)
-    # print len(alphabet)
+    train = train[:1000]
+    test = test[:1000]
+    dev = dev[:1000]
+    alphabet,embeddings = prepare([train,test,dev],dim = 300,is_embedding_needed = True,fresh = True)
+    print len(alphabet)
     # get_overlap_dict(train,alphabet)
     # file = open('word_wiki.txt','w')
     # for w in alphabet:
