@@ -39,7 +39,7 @@ def log_time_delta(func):
     return _deco
 
 
-isEnglish = True
+isEnglish = False
 if is_stemmed_needed:
     stemmer = stem.lancaster.LancasterStemmer()
 class Alphabet(dict):
@@ -110,7 +110,7 @@ def load_text_vec(alphabet,filename="",embedding_size = 100):
             i+=1
             if i % 100000 == 0:
                     print 'epch %d' % i
-            items = line.strip().split(' ')
+            items = line.decode('utf-8').strip().split(' ')
             if len(items) == 2:
                 vocab_size, embedding_size= items[0],items[1]
                 print ( vocab_size, embedding_size)
