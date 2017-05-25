@@ -479,11 +479,11 @@ def getSubVectorsFromDict(vectors,vocab,dim = 300):
             count += 1
             embedding[vocab[word]]= vectors[word]
         else:
-            if word in names:
-                embedding[vocab[word]] = vectors['谁']
-            else:
-                file.write(word + '\n')
-                embedding[vocab[word]]= np.random.uniform(-0.25,0.25,dim) #.tolist()
+            # if word in names:
+            #     embedding[vocab[word]] = vectors['谁']
+            # else:
+            #     file.write(word + '\n')
+            embedding[vocab[word]]= np.random.uniform(-0.25,0.25,dim) #.tolist()
     file.close()
     print 'word in embedding',count
     return embedding

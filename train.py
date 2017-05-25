@@ -57,7 +57,7 @@ tf.flags.DEFINE_integer("evaluate_every", 500, "Evaluate model on dev set after 
 tf.flags.DEFINE_integer("checkpoint_every", 500, "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_boolean('overlap_needed',False,"is overlap used")
 tf.flags.DEFINE_boolean('dns','False','whether use dns or not')
-tf.flags.DEFINE_string('data','nlpcc','data set')
+tf.flags.DEFINE_string('data','wiki','data set')
 tf.flags.DEFINE_string('CNN_type','apn','data set')
 tf.flags.DEFINE_float('sample_train',1,'sampe my train data')
 tf.flags.DEFINE_boolean('fresh',True,'wheather recalculate the embedding or overlap default is True')
@@ -207,7 +207,7 @@ def test_point_wise():
 @log_time_delta
 def test_pair_wise(dns = FLAGS.dns):
     train,test,dev = load(FLAGS.data,filter = True)
-    replace_number([train,test,dev])
+    # replace_number([train,test,dev])
     # train = sample_data(train,frac = FLAGS.sample_train)
     # test = sample_data(train,frac = FLAGS.sample_train)
     # dev = sample_data(dev,frac = FLAGS.sample_train)
