@@ -39,7 +39,7 @@ def log_time_delta(func):
     return _deco
 
 
-isEnglish = False
+isEnglish = True
 if is_stemmed_needed:
     stemmer = stem.lancaster.LancasterStemmer()
 class Alphabet(dict):
@@ -482,7 +482,7 @@ def getSubVectorsFromDict(vectors,vocab,dim = 300):
             # if word in names:
             #     embedding[vocab[word]] = vectors['谁']
             # else:
-            #     file.write(word + '\n')
+            file.write(word + '\n')
             embedding[vocab[word]]= np.random.uniform(-0.25,0.25,dim) #.tolist()
     file.close()
     print 'word in embedding',count
@@ -501,7 +501,7 @@ def cut(sentence,isEnglish = isEnglish):
         tokens = sentence.lower().split()
     else:
         # words = jieba.cut(str(sentence))
-        tokens = [word for word in sentence.split() if word not in stopwords]
+        tokens = [word for word in sentence.decode('utf-8').lower().split() if word not in stopwords]
     return tokens
 class Seq_gener(object):
     def __init__(self,alphabet,max_lenght):
@@ -969,8 +969,9 @@ if __name__ == '__main__':
     train,test,dev = load('nlpcc',filter = False)
     # true_answer = test[test['flag'] == 1]['answer']
     # print true_answer[true_answer.str.len() > 100].to_csv();
-    replace_number([train,test,dev])
-    test[test['flag'] == 1].to_csv('test_flag1',header = None)
+    # replace_number([train,test,dev])
+    print len(test[test['flag'] == 1]) / float(len(test))
+    # test[test['flag'] == 1].to_csv('test_flag1',header = None)
     exit()
     # train[train['flag'] == 1].to_csv('flag1')
     replace_number([train,test,dev])
