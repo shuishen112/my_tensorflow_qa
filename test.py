@@ -285,11 +285,10 @@ if __name__ == '__main__':
 	# import itertools
 	# merged = list(itertools.chain(*a))
 	# print merged
-	a = None
-	if a :
-		print 'hello'
-	else:
-		print 'world'
+
+	a = []
+	b = ' '.join(a)
+	print 
 	# testDropout()
 	# seefile()
 	# def createGenerator():

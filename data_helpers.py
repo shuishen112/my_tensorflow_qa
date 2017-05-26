@@ -110,7 +110,7 @@ def load_text_vec(alphabet,filename="",embedding_size = 100):
             i+=1
             if i % 100000 == 0:
                     print 'epch %d' % i
-            items = line.decode('utf-8').strip().split(' ')
+            items = line.strip().split(' ')
             if len(items) == 2:
                 vocab_size, embedding_size= items[0],items[1]
                 print ( vocab_size, embedding_size)
@@ -501,7 +501,7 @@ def cut(sentence,isEnglish = isEnglish):
         tokens = sentence.lower().split()
     else:
         # words = jieba.cut(str(sentence))
-        tokens = [word for word in sentence.decode('utf-8').lower().split() if word not in stopwords]
+        tokens = [word for word in sentence.lower().split() if word not in stopwords]
     return tokens
 class Seq_gener(object):
     def __init__(self,alphabet,max_lenght):
@@ -522,7 +522,6 @@ def getQAIndiceofTest(df,alphabet,max_lenght=50):
 @log_time_delta
 def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
     vocab_file = 'model/voc'
-    import itertools
     
     if os.path.exists(vocab_file) and not fresh:
         alphabet = pickle.load(open(vocab_file,'r'))
@@ -960,19 +959,35 @@ def sample_data(df,frac = 0.5):
     return df
 def replace_number(data):
     for df in data:
-        df['question'] = df['question'].str.replace(r'[A-Za-z]+','')
+        # df['question'] = df['question'].str.replace(r'[A-Za-z]+','')
         # df['question'] = df['question'].str.replace(r'[\d]+','')
-        df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','')
+        # df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','')
         # df['answer'] = df['answer'].str.replace(r'[\d]+','')
+        df = df.dropna(axis = 0)
+def deal_nan(dataset):
+    data_dir="data/"+dataset
+    train_file=os.path.join(data_dir,"train.txt")
+    test_file=os.path.join(data_dir,"test.txt")
+    dev_file = os.path.join(data_dir,'dev.txt')
+    
+
+    train=pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
+    test=pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
+    dev = pd.read_csv(dev_file,header = None,sep = '\t',names = ['question','answer','flag'],quoting = 3)
 if __name__ == '__main__':
-    # data_processing()
+    data_processing()
+    exit()
     train,test,dev = load('nlpcc',filter = False)
+    train = train.dropna(axis = 0)
+    print train
+    print train[pd.isnull(train['answer']) == True]['flag'] == 1
+    exit()
     # true_answer = test[test['flag'] == 1]['answer']
     # print true_answer[true_answer.str.len() > 100].to_csv();
     # replace_number([train,test,dev])
     print len(test[test['flag'] == 1]) / float(len(test))
-    # test[test['flag'] == 1].to_csv('test_flag1',header = None)
-    exit()
+    test[test['flag'] == 1].to_csv('test_flag1',header = None)
+
     # train[train['flag'] == 1].to_csv('flag1')
     replace_number([train,test,dev])
     # data_processing()

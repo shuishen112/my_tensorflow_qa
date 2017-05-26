@@ -57,7 +57,7 @@ tf.flags.DEFINE_integer("evaluate_every", 500, "Evaluate model on dev set after 
 tf.flags.DEFINE_integer("checkpoint_every", 500, "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_boolean('overlap_needed',False,"is overlap used")
 tf.flags.DEFINE_boolean('dns','False','whether use dns or not')
-tf.flags.DEFINE_string('data','wiki','data set')
+tf.flags.DEFINE_string('data','nlpcc','data set')
 tf.flags.DEFINE_string('CNN_type','apn','data set')
 tf.flags.DEFINE_float('sample_train',1,'sampe my train data')
 tf.flags.DEFINE_boolean('fresh',True,'wheather recalculate the embedding or overlap default is True')
@@ -207,13 +207,13 @@ def test_point_wise():
 @log_time_delta
 def test_pair_wise(dns = FLAGS.dns):
     train,test,dev = load(FLAGS.data,filter = True)
+    train = train.dropna(axis = 0)
+    test = test.dropna(axis = 0)
+    dev = dev.dropna(axis = 0)
     # replace_number([train,test,dev])
     # train = sample_data(train,frac = FLAGS.sample_train)
     # test = sample_data(train,frac = FLAGS.sample_train)
     # dev = sample_data(dev,frac = FLAGS.sample_train)
-    # train = train[:1000]
-    # test = test[:1000]
-    # dev = dev[:1000]
     q_max_sent_length = 25#max(map(lambda x:len(x),train['question'].str.split()))
     a_max_sent_length = 75#max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
