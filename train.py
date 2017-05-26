@@ -211,7 +211,7 @@ def test_pair_wise(dns = FLAGS.dns):
     train = train.dropna(axis = 0)
     test = test.dropna(axis = 0)
     dev = dev.dropna(axis = 0)
-    # replace_number([train,test,dev])
+    replace_number([train,test,dev])
     # train = sample_data(train,frac = FLAGS.sample_train)
     # test = sample_data(train,frac = FLAGS.sample_train)
     # dev = sample_data(dev,frac = FLAGS.sample_train)
@@ -251,7 +251,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 overlap_needed = FLAGS.overlap_needed,
                 learning_rate=FLAGS.learning_rate,
                 trainable = FLAGS.trainable,
-                extend_feature_dim = FLAGS.extend_feature_dim
+                extend_feature_dim = FLAGS.extend_feature_dim,
                 model_type=FLAGS.CNN_type)
 
             # Define Training procedure
