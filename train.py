@@ -49,6 +49,7 @@ tf.flags.DEFINE_float("learning_rate", 1e-3, "learn rate( default: 0.0)")
 tf.flags.DEFINE_integer("max_len_left", 40, "max document length of left input")
 tf.flags.DEFINE_integer("max_len_right", 40, "max document length of right input")
 tf.flags.DEFINE_string("loss","pair_wise","loss function (default:point_wise)")
+tf.flags.DEFINE_integer('extend_feature_dim',10,'overlap_feature_dim')
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
 tf.flags.DEFINE_boolean("trainable", True, "is embedding trainable? (default: False)")
@@ -215,7 +216,7 @@ def test_pair_wise(dns = FLAGS.dns):
     # test = sample_data(train,frac = FLAGS.sample_train)
     # dev = sample_data(dev,frac = FLAGS.sample_train)
     q_max_sent_length = 25#max(map(lambda x:len(x),train['question'].str.split()))
-    a_max_sent_length = 75#max(map(lambda x:len(x),train['answer'].str.split()))
+    a_max_sent_length = 200#max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
     print 'train question unique:{}'.format(len(train['question'].unique()))
     print 'train length',len(train)
@@ -250,6 +251,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 overlap_needed = FLAGS.overlap_needed,
                 learning_rate=FLAGS.learning_rate,
                 trainable = FLAGS.trainable,
+                extend_feature_dim = FLAGS.extend_feature_dim
                 model_type=FLAGS.CNN_type)
 
             # Define Training procedure
