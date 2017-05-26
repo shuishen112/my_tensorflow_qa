@@ -501,7 +501,7 @@ def cut(sentence,isEnglish = isEnglish):
         tokens = sentence.lower().split()
     else:
         # words = jieba.cut(str(sentence))
-        tokens = [word for word in sentence.lower().split() if word not in stopwords]
+        tokens = [word for word in sentence.split() if word not in stopwords]
     return tokens
 class Seq_gener(object):
     def __init__(self,alphabet,max_lenght):
