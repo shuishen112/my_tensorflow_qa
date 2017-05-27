@@ -23,7 +23,7 @@ dataset= "wiki"
 UNKNOWN_WORD_IDX = 0
 is_stemmed_needed = False
 stopwords = { word.decode("utf-8") for word in open("model/chStopWordsSimple.txt").read().split()}
-names = {word for word in open('names.txt').read().split()}
+# names = {word for word in open('names.txt').read().split()}
 
 from functools import wraps
 #print( tf.__version__)
@@ -117,6 +117,7 @@ def load_text_vec(alphabet,filename="",embedding_size = 100):
             else:
                 word = items[0]
                 if word in alphabet:
+                    print word
                     vectors[word] = items[1:]
     print 'embedding_size',embedding_size
     print 'done'
@@ -473,6 +474,7 @@ def getSubVectorsFromDict(vectors,vocab,dim = 300):
     file = open('missword','w')
     embedding = np.zeros((len(vocab),dim))
     count = 1
+    unknow = np.random.uniform(-0.25,0.25,dim)
     for word in vocab:
         
         if word in vectors:
@@ -483,7 +485,7 @@ def getSubVectorsFromDict(vectors,vocab,dim = 300):
             #     embedding[vocab[word]] = vectors['谁']
             # else:
             file.write(word + '\n')
-            embedding[vocab[word]]= np.random.uniform(-0.25,0.25,dim) #.tolist()
+            embedding[vocab[word]]= unknow #.tolist()
     file.close()
     print 'word in embedding',count
     return embedding
@@ -519,6 +521,22 @@ def getQAIndiceofTest(df,alphabet,max_lenght=50):
     questions = pool.map(Seq_gener(alphabet,max_lenght),df["question"])
     answers = pool.map(Seq_gener(alphabet,max_lenght),df["answer"])
     return [np.array(questions),np.array(answers)]
+def load_another(dataset = dataset, filter=False):
+
+    data_dir="data/"+dataset
+    train_file=os.path.join(data_dir,"train.rm_stop_txt")
+    test_file=os.path.join(data_dir,"test.rm_stop_txt")
+    dev_file = os.path.join(data_dir,'dev.rm_stop_txt')
+    
+
+    train=pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
+    test=pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
+    dev = pd.read_csv(dev_file,header = None,sep = '\t',names = ['question','answer','flag'],quoting = 3)
+    
+
+    if filter == True:
+        return removeUnanswerdQuestion(train),removeUnanswerdQuestion(test),removeUnanswerdQuestion(dev)
+    return train,test,dev
 @log_time_delta
 def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
     vocab_file = 'model/voc'
@@ -554,7 +572,6 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
                             #     print type(e)
                             
                         else:
-
                             alphabet.add(token)
         print len(alphabet.keys())
         pickle.dump(alphabet,open(vocab_file,'w'))
@@ -575,6 +592,7 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
             else:
                 fname = 'model/wiki.ch.text.vector'
                 embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
+                exit()
                 sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             pickle.dump(sub_embeddings,open(sub_vec_file,'w'))
         # print (len(alphabet.keys()))
@@ -959,11 +977,11 @@ def sample_data(df,frac = 0.5):
     return df
 def replace_number(data):
     for df in data:
-        # df['question'] = df['question'].str.replace(r'[A-Za-z]+','')
-        # df['question'] = df['question'].str.replace(r'[\d]+','')
-        # df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','')
-        # df['answer'] = df['answer'].str.replace(r'[\d]+','')
-        df = df.dropna(axis = 0)
+        df['question'] = df['question'].str.replace(r'[A-Za-z]+','')
+        df['question'] = df['question'].str.replace(r'[\d]+','')
+        df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','')
+        df['answer'] = df['answer'].str.replace(r'[\d]+','')
+        # df = df.dropna(axis = 0)
 def deal_nan(dataset):
     data_dir="data/"+dataset
     train_file=os.path.join(data_dir,"train.txt")
@@ -975,26 +993,29 @@ def deal_nan(dataset):
     test=pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
     dev = pd.read_csv(dev_file,header = None,sep = '\t',names = ['question','answer','flag'],quoting = 3)
 if __name__ == '__main__':
-    data_processing()
-    exit()
+    # data_processing()
+    # exit()
     train,test,dev = load('nlpcc',filter = False)
     train = train.dropna(axis = 0)
-    print train
-    print train[pd.isnull(train['answer']) == True]['flag'] == 1
-    exit()
+    test = test.dropna(axis = 0)
+    dev = dev.dropna(axis = 0)
+    # train = train.dropna(axis = 0)
+    # print train
+    # print train[pd.isnull(train['answer']) == True]['flag'] == 1
+    # exit()
     # true_answer = test[test['flag'] == 1]['answer']
     # print true_answer[true_answer.str.len() > 100].to_csv();
     # replace_number([train,test,dev])
-    print len(test[test['flag'] == 1]) / float(len(test))
-    test[test['flag'] == 1].to_csv('test_flag1',header = None)
+    # print len(test[test['flag'] == 1]) / float(len(test))
+    # test[test['flag'] == 1].to_csv('test_flag1',header = None)
 
-    # train[train['flag'] == 1].to_csv('flag1')
-    replace_number([train,test,dev])
+    # # train[train['flag'] == 1].to_csv('flag1')
+    # replace_number([train,test,dev])
     # data_processing()
-    print train
-    train = train[:1000]
-    test = test[:1000]
-    dev = dev[:1000]
+    # print train
+    # train = train[:1000]
+    # test = test[:1000]
+    # dev = dev[:1000]
     alphabet,embeddings = prepare([train,test,dev],dim = 300,is_embedding_needed = True,fresh = True)
     print len(alphabet)
     # get_overlap_dict(train,alphabet)
