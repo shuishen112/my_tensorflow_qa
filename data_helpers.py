@@ -117,7 +117,6 @@ def load_text_vec(alphabet,filename="",embedding_size = 100):
             else:
                 word = items[0]
                 if word in alphabet:
-                    print word
                     vectors[word] = items[1:]
     print 'embedding_size',embedding_size
     print 'done'
@@ -592,7 +591,6 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
             else:
                 fname = 'model/wiki.ch.text.vector'
                 embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
-                exit()
                 sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             pickle.dump(sub_embeddings,open(sub_vec_file,'w'))
         # print (len(alphabet.keys()))
