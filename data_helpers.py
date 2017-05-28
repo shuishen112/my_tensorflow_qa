@@ -483,7 +483,7 @@ def getSubVectorsFromDict(vectors,vocab,dim = 300):
             #     embedding[vocab[word]] = vectors['谁']
             # else:
             file.write(word + '\n')
-            embedding[vocab[word]]= vectors['[UNKNOW]'] #.tolist()
+            embedding[vocab[word]]= np.random.uniform(-0.5,+0.5,dim)#vectors['[UNKNOW]'] #.tolist()
     file.close()
     print 'word in embedding',count
     return embedding
@@ -588,7 +588,7 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
                     embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
                     sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             else:
-                fname = 'model/wiki.ch.text100.vector'
+                fname = 'model/wiki.ch.text.vector'
                 embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
                 sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             pickle.dump(sub_embeddings,open(sub_vec_file,'w'))
