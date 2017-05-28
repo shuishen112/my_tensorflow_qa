@@ -95,7 +95,7 @@ def get_feature():
 
 
 if __name__ == '__main__':
-	# get_feature()
+	get_feature()
 	# data_processing()
 	# random_result()
-	overlap_visualize()
+	# overlap_visualize()

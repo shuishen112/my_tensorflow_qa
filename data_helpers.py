@@ -473,7 +473,6 @@ def getSubVectorsFromDict(vectors,vocab,dim = 300):
     file = open('missword','w')
     embedding = np.zeros((len(vocab),dim))
     count = 1
-    unknow = np.random.uniform(-0.25,0.25,dim)
     for word in vocab:
         
         if word in vectors:
@@ -484,7 +483,7 @@ def getSubVectorsFromDict(vectors,vocab,dim = 300):
             #     embedding[vocab[word]] = vectors['谁']
             # else:
             file.write(word + '\n')
-            embedding[vocab[word]]= unknow #.tolist()
+            embedding[vocab[word]]= vectors['[UNKNOW]'] #.tolist()
     file.close()
     print 'word in embedding',count
     return embedding
@@ -544,7 +543,7 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
         alphabet = pickle.load(open(vocab_file,'r'))
     else:   
         alphabet = Alphabet(start_feature_id=0)
-        alphabet.add('UNKNOWN_WORD_IDX_0')  
+        alphabet.add('[UNKNOW]')  
         alphabet.add('END') 
         count = 0
         for corpus in cropuses:
@@ -589,7 +588,7 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
                     embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
                     sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             else:
-                fname = 'model/wiki.ch.text.vector'
+                fname = 'model/wiki.ch.text100.vector'
                 embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
                 sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             pickle.dump(sub_embeddings,open(sub_vec_file,'w'))
@@ -990,13 +989,74 @@ def deal_nan(dataset):
     train=pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
     test=pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
     dev = pd.read_csv(dev_file,header = None,sep = '\t',names = ['question','answer','flag'],quoting = 3)
-if __name__ == '__main__':
-    # data_processing()
-    # exit()
-    train,test,dev = load('nlpcc',filter = False)
+def position_apply1(row):
+    question =cut_word(row["question"]) 
+    answer = cut_word(row["answer"]) 
+    align=np.zeros(len(question))
+    for i,q_item in enumerate (question):
+        if q_item in answer:
+            align[i]=1
+    colums_names=["p"+str(i) for i in range(len(question))]
+    
+    return pd.Series(align,index=colums_names)
+def ma_overlap_zi(row):
+    question = cut(row["question"])
+    answer = cut(row["answer"])
+    
+    di_question = []
+    di_answer = []
+    for w in question:
+        
+
+        for i in range(len(w) ):
+            di_question.append(w[i])
+    for w in answer:
+        
+        for i in range(len(w) ):
+            di_answer.append(w[i])
+
+    di_overlap = set(di_question).intersection(set(di_answer) )
+
+    di_weight_p = dict({})
+    for k in range(len(di_question) ):
+        if di_question[k] in di_overlap:
+            # print int(100*((k+1)/(len(question)+1)) )
+            di_weight_p[di_question[k] ] =((k+1)/len(di_question))**3.2# zi_weight[ int(100*((k+1)/(len(di_question)+1)) )]#((k+1)/len(di_question))**3.2
+    di_weight_all = 0.0
+    for k in di_overlap:
+        di_weight_all += di_weight_p[k]
+    return di_weight_all /(len(di_answer)+40)
+def ma_overlap(row):
+    question = cut(row["question"])
+    answer = cut(row["answer"])
+
+    overlap= set(answer).intersection(set(question))
+    weight_position = dict({})
+    for k in range(len(question) ):
+        if question[k] in overlap:
+            weight_position[question[k] ] = ((k+1)/(len(question)+1))**3.2
+
+    weight_all = 0.0
+    for k in overlap:
+        weight_all += weight_position[k]
+    return weight_all 
+def get_feature():
+    train,test,dev = load("nlpcc",filter = False)
     train = train.dropna(axis = 0)
     test = test.dropna(axis = 0)
     dev = dev.dropna(axis = 0)
+    test = test.reindex(np.random.permutation(test.index))
+
+    test['pred'] = test.apply(ma_overlap,axis = 1)
+    print evaluation.evaluationBypandas(test,test['pred'])
+if __name__ == '__main__':
+    get_feature()
+    # data_processing()
+    # exit()
+    # train,test,dev = load('nlpcc',filter = False)
+    # train = train.dropna(axis = 0)
+    # test = test.dropna(axis = 0)
+    # dev = dev.dropna(axis = 0)
     # train = train.dropna(axis = 0)
     # print train
     # print train[pd.isnull(train['answer']) == True]['flag'] == 1
@@ -1014,8 +1074,8 @@ if __name__ == '__main__':
     # train = train[:1000]
     # test = test[:1000]
     # dev = dev[:1000]
-    alphabet,embeddings = prepare([train,test,dev],dim = 300,is_embedding_needed = True,fresh = True)
-    print len(alphabet)
+    # alphabet,embeddings = prepare([train,test,dev],dim = 300,is_embedding_needed = True,fresh = True)
+    # print len(alphabet)
     # get_overlap_dict(train,alphabet)
     # file = open('word_wiki.txt','w')
     # for w in alphabet:

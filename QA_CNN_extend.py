@@ -44,11 +44,11 @@ class QA_CNN_extend(object):
                 print "random embedding"
                 W = tf.Variable(tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),name="W",trainable = trainable)
             self.embedding_W = W
-            a = np.zeros((3,self.extend_feature_dim),dtype = 'float32')
-            a[1,:] = 1
-            a[2,:] = 2
-            # self.overlap_W = tf.Variable(tf.random_uniform([3, self.extend_feature_dim], -1.0, 1.0),name="W",trainable = True)
-            self.overlap_W = tf.Variable(a,name="W",trainable = True)
+            # a = np.zeros((3,self.extend_feature_dim),dtype = 'float32')
+            # a[1,:] = 1
+            # a[2,:] = 2
+            self.overlap_W = tf.Variable(tf.random_uniform([3, self.extend_feature_dim], -1.0, 1.0),name="W",trainable = True)
+            # self.overlap_W = tf.Variable(a,name="W",trainable = True)
             self.para.append(self.embedding_W)
             self.para.append(self.overlap_W)
         self.kernels = []
@@ -158,7 +158,7 @@ class QA_CNN_extend(object):
             cnn_reshaped = tf.concat(3, cnn_outputs)
         return cnn_reshaped
 
-    def getCosine(self,q,a ):
+    def getCosine(self,q,a):
         pooled_flat_1 = tf.nn.dropout(q, self.dropout_keep_prob)
         pooled_flat_2 = tf.nn.dropout(a, self.dropout_keep_prob)
         

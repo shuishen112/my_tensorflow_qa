@@ -40,7 +40,7 @@ def log_time_delta(func):
 
 
 # Model Hyperparameters
-tf.flags.DEFINE_integer("embedding_dim",300, "Dimensionality of character embedding (default: 128)")
+tf.flags.DEFINE_integer("embedding_dim",100, "Dimensionality of character embedding (default: 128)")
 tf.flags.DEFINE_string("filter_sizes", "1,2,3,5", "Comma-separated filter sizes (default: '3,4,5')")
 tf.flags.DEFINE_integer("num_filters", 128, "Number of filters per filter size (default: 128)")
 tf.flags.DEFINE_float("dropout_keep_prob", 1, "Dropout keep probability (default: 0.5)")
@@ -59,7 +59,7 @@ tf.flags.DEFINE_integer("checkpoint_every", 500, "Save model after this many ste
 tf.flags.DEFINE_boolean('overlap_needed',False,"is overlap used")
 tf.flags.DEFINE_boolean('dns','False','whether use dns or not')
 tf.flags.DEFINE_string('data','nlpcc','data set')
-tf.flags.DEFINE_string('CNN_type','apn','data set')
+tf.flags.DEFINE_string('CNN_type','qacnn','data set')
 tf.flags.DEFINE_float('sample_train',1,'sampe my train data')
 tf.flags.DEFINE_boolean('fresh',True,'wheather recalculate the embedding or overlap default is True')
 # Misc Parameters
@@ -189,25 +189,26 @@ def test_point_wise():
                         print("{}: step {}, loss {:g}, acc {:g}  ".format(time_str, step, loss, accuracy))
                     # print loss
                 # predicted_train = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                map_mrr_train = evaluation.evaluationBypandas(train,predicted[:,-1])
+                # predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+                # map_mrr_train = evaluation.evaluationBypandas(train,predicted[:,-1])
                 predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 map_mrr_test = evaluation.evaluationBypandas(test,predicted[:,-1])
-                predicted = predict(sess,cnn,dev,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                map_mrr_dev = evaluation.evaluationBypandas(dev,predicted[:,-1])
+                # predicted = predict(sess,cnn,dev,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+                # map_mrr_dev = evaluation.evaluationBypandas(dev,predicted[:,-1])
                 # map_mrr_train = evaluation.evaluationBypandas(train,predicted_train[:,-1])
                 # print evaluation.evaluationBypandas(train,predicted_train[:,-1])
-                print "{}:train epoch:map mrr {}".format(i,map_mrr_train)
+                # print "{}:train epoch:map mrr {}".format(i,map_mrr_train)
                 print "{}:test epoch:map mrr {}".format(i,map_mrr_test)
-                print "{}:dev epoch:map mrr {}".format(i,map_mrr_dev)
-                line = " {}:epoch: map_train{}----map_test{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_test[0],map_mrr_dev[0])
+                # print "{}:dev epoch:map mrr {}".format(i,map_mrr_dev)
+                # line = " {}:epoch: map_train{}----map_test{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_test[0],map_mrr_dev[0])
+                line = " {}:epoch: map_test{}".format(i,map_mrr_test[0])
                 log.write(line + '\n')
                 log.flush()
             log.close()
 
 @log_time_delta
 def test_pair_wise(dns = FLAGS.dns):
-    train,test,dev = load(FLAGS.data,filter = True)
+    train,test,dev = load(FLAGS.data,filter = False)
     train = train.dropna(axis = 0)
     test = test.dropna(axis = 0)
     dev = dev.dropna(axis = 0)
@@ -218,8 +219,8 @@ def test_pair_wise(dns = FLAGS.dns):
     train = train[:1000]
     test = test[:1000]
     dev = dev[:1000]
-    q_max_sent_length = 40#max(map(lambda x:len(x),train['question'].str.split()))
-    a_max_sent_length = 200#max(map(lambda x:len(x),train['answer'].str.split()))
+    q_max_sent_length = 25#max(map(lambda x:len(x),train['question'].str.split()))
+    a_max_sent_length = 75#max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
     print 'train question unique:{}'.format(len(train['question'].unique()))
     print 'train length',len(train)
