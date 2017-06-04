@@ -434,16 +434,17 @@ def removeUnanswerdQuestion(df):
 
     return df[df["question"].isin(questions_have_correct) &  df["question"].isin(questions_have_correct) & df["question"].isin(questions_have_uncorrect)].reset_index()
 
-def load(dataset = dataset, filter=False):
+def load(dataset = dataset, filter = False):
 
     data_dir="data/"+dataset
     train_file=os.path.join(data_dir,"train.txt")
     test_file=os.path.join(data_dir,"test.txt")
     dev_file = os.path.join(data_dir,'dev.txt')
+    sub_file = os.path.join(data_dir,'submit.txt')
     
 
     # train=pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
-    test=pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
+    test = pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
     dev = pd.read_csv(dev_file,header = None,sep = '\t',names = ['question','answer','flag'],quoting = 3)
     if dataset == 'trec':
         train_all_file = os.path.join(data_dir,"train-all.txt")
@@ -452,10 +453,11 @@ def load(dataset = dataset, filter=False):
         train = train_all[['question','answer','flag']]
     else:
         train = pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
+    submit = pd.read_csv(sub_file,header = None,sep = '\t',names = ['question','answer'],quoting = 3)
 
     if filter == True:
         return removeUnanswerdQuestion(train),removeUnanswerdQuestion(test),removeUnanswerdQuestion(dev)
-    return train,test,dev
+    return train,test,dev,submit
 
 def sentence_index(sen, alphabet, input_lens):
     sen = sen.split()
