@@ -333,7 +333,7 @@ def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 
     for i in range(0,n_batches):
         batch = pairs[i*batch_size:(i+1) * batch_size]
         yield [[pair[i] for pair in batch]  for i in range(7)]
-
+'''
 @log_time_delta
 def get_overlap_dict(df,alphabet,q_len = 40,a_len = 40):
     d = dict()
@@ -347,6 +347,17 @@ def get_overlap_dict(df,alphabet,q_len = 40,a_len = 40):
                 d[(question,pos)] = (q_pos_overlap,a_pos_overlap)
                 q_neg_overlap,a_neg_overlap = overlap_index(question,neg,q_len,a_len)
                 d[(question,neg)] = (q_neg_overlap,a_neg_overlap)
+    return d
+'''
+@log_time_delta
+def get_overlap_dict(df,alphabet,q_len = 40,a_len = 40):
+    d = dict()
+    for question in df['question'].unique():
+        group = df[df['question'] == question]
+        answers = group['answer']
+        for ans in answers:
+            q_overlap,a_overlap = overlap_index(question,ans,q_len,a_len)
+            d[(question,ans)] = (q_overlap,a_overlap)
     return d
 def batch_gen_with_overlap(df,alphabet,batch_size = 10,qlen = 40,a_len = 40):
     pairs = get_raw_pairs(df)
