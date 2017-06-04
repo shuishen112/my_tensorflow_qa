@@ -230,7 +230,6 @@ def test_pair_wise(dns = FLAGS.dns):
     alphabet,embeddings = prepare([train,test,dev,submit],dim = FLAGS.embedding_dim,is_embedding_needed = True,fresh = FLAGS.fresh)
     # alphabet,embeddings = prepare_300([train,test,dev])
     print 'alphabet:',len(alphabet)
-
     with tf.Graph().as_default(), tf.device("/gpu:0"):
         # with tf.device("/cpu:0"):
         session_conf = tf.ConfigProto(
@@ -270,7 +269,7 @@ def test_pair_wise(dns = FLAGS.dns):
             sess.run(tf.global_variables_initializer())
             print "variables_initializer"
             if dns == True:
-                loadfile="runs/20170513/20170514042828__wiki0.716650540915"
+                loadfile="runs/20170604/20170604145133__nlpcc0.828841301488"
                 saver.restore(sess, loadfile)
                 predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 map_mrr_train = evaluation.evaluationBypandas(train,predicted)
@@ -280,6 +279,22 @@ def test_pair_wise(dns = FLAGS.dns):
                 print map_mrr_test
             # seq_process(train, alphabet)
             # seq_process(test, alphabet)
+            print 'get my submit result'
+            loadfile="runs/20170604/20170604145133__nlpcc0.828841301488"
+            saver.restore(sess, loadfile)
+            predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+            map_mrr_train = evaluation.evaluationBypandas(train,predicted)
+            predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+            map_mrr_test = evaluation.evaluationBypandas(test,predicted)
+            print 'map_mrr train',map_mrr_train
+            print 'map_prr dev',map_mrr_test
+
+            predict_submit = predict(sess,cnn,submit,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+            submit['predicted'] = predict_submit
+            submit['predicted'].to_csv('train.QApair.TJU_IR_QA2017.score',index = False,sep = '\t')
+            print 'predict over'
+
+
             map_max = 0.65
             for i in range(1000):
                 if dns ==True:
