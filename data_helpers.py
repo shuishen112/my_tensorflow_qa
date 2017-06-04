@@ -1019,8 +1019,6 @@ def ma_overlap_zi(row):
     di_question = []
     di_answer = []
     for w in question:
-        
-
         for i in range(len(w) ):
             di_question.append(w[i])
     for w in answer:
@@ -1062,8 +1060,47 @@ def get_feature():
 
     test['pred'] = test.apply(ma_overlap,axis = 1)
     print evaluation.evaluationBypandas(test,test['pred'])
+def type(row):
+    type_array = np.zeros(5)
+    question=row["question"]
+    answer=str(row["answer"])
+    #print question+":",
+    q_type=questionType(question)
+    # print "%s -> %s " %(question,q_type) ,
+    
+    if ner_dict.has_key(answer):
+        ner_info= ner_dict[answer]
+        # print ner_info,
+        if q_type == 'number':
+            if 'numeral' in ner_info:
+                return 1
+        elif q_type == 'time':
+            if 'time word' in ner_info:
+                return 2
+        elif q_type == 'organization':
+            if 'organization/group name' in ner_info:
+                return 3;
+        elif q_type == "person":
+            if "personal name" in ner_info or 'transcribed personal name' in ner_info:
+                return 4
+        elif q_type == "place":
+            if "toponym" in ner_info or 'locative word' in ner_info or 'transcribed toponym' in ner_info:
+                # print "place"
+                return 5
+        else:
+            return 0
+    return 0
+def model_mixed():
+    data_dir = "data/" + 'nlpcc'
+    test_file = os.path.join(data_dir,"test.txt")
+    test = pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
+    predicted = pd.read_csv('train.QApair.Tju_IR_QA.score',names = ['score'])
+    map_mrr_test = evaluation.evaluationBypandas(test,predicted)
+
+    print map_mrr_test
 if __name__ == '__main__':
-    get_feature()
+    model_mixed()
+    # get_feature()
     # data_processing()
     # exit()
     # train,test,dev = load('nlpcc',filter = False)

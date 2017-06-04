@@ -269,7 +269,7 @@ def test_pair_wise(dns = FLAGS.dns):
             sess.run(tf.global_variables_initializer())
             print "variables_initializer"
             if dns == True:
-                loadfile="runs/20170604/20170604145133__nlpcc0.828841301488"
+                loadfile="runs/20170604/20170604183633__nlpcc0.833940715393"
                 saver.restore(sess, loadfile)
                 predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 map_mrr_train = evaluation.evaluationBypandas(train,predicted)
@@ -280,18 +280,22 @@ def test_pair_wise(dns = FLAGS.dns):
             # seq_process(train, alphabet)
             # seq_process(test, alphabet)
             print 'get my submit result'
-            loadfile="runs/20170604/20170604145133__nlpcc0.828841301488"
+            loadfile="runs/20170604/20170604183633__nlpcc0.833940715393"
             saver.restore(sess, loadfile)
             predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+            train['predicted'] = predicted
+            train['predicted'].to_csv('train.QApair.TJU_IR_QA2017_train.score',index = False,sep = '\t')
             map_mrr_train = evaluation.evaluationBypandas(train,predicted)
-            predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-            map_mrr_test = evaluation.evaluationBypandas(test,predicted)
+            predicted_test = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+            test['predicted'] = predicted_test
+            test['predicted'].to_csv('train.QApair.TJU_IR_QA2017.score',index = False,sep = '\t')
+            map_mrr_test = evaluation.evaluationBypandas(test,predicted_test)
             print 'map_mrr train',map_mrr_train
             print 'map_prr dev',map_mrr_test
 
             predict_submit = predict(sess,cnn,submit,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
             submit['predicted'] = predict_submit
-            submit['predicted'].to_csv('train.QApair.TJU_IR_QA2017.score',index = False,sep = '\t')
+            submit['predicted'].to_csv('train.QApair.TJU_IR_QA2017_submit.score',index = False,sep = '\t')
             print 'predict over'
 
 
