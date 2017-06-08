@@ -285,15 +285,8 @@ if __name__ == '__main__':
 	# import itertools
 	# merged = list(itertools.chain(*a))
 	# print merged
-	a = np.zeros((3,10),dtype = 'float32')
-	a[1,:] = 1
-	a[2,:] = 2
-	print type(a[1][1])
-
-	b = tf.Variable(a)
-	with tf.Session() as sess:
-		sess.run(tf.global_variables_initializer())
-		print sess.run(b)
+	a = [1,2,3]
+	print tuple(a)
 	# a = []
 	# b = ' '.join(a)
 	# print 

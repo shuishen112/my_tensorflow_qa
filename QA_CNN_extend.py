@@ -20,7 +20,7 @@ class QA_CNN_extend(object):
         self.extend_feature_dim = extend_feature_dim
         self.max_input_left = max_input_left
         self.max_input_right = max_input_right
-        self.overlap_needed=overlap_needed
+        self.overlap_needed = overlap_needed
         self.num_filters_total = self.num_filters * len(self.filter_sizes)
         if self.overlap_needed:
             self.total_embedding_dim = embedding_size + extend_feature_dim
@@ -76,6 +76,7 @@ class QA_CNN_extend(object):
             if model_type=="qacnn":
 
                 q_pos_feature_map,q_neg_feature_map,a_pos_feature_map,a_neg_feature_map= [self.getFeatureMap(embedding,right=i/2) for i,embedding in enumerate(embeddings) ]
+
                 self.score12 = self.getCosine(q_pos_feature_map,a_pos_feature_map)
                 self.score13 = self.getCosine(q_neg_feature_map,a_neg_feature_map)
             elif model_type=="apn":
@@ -134,7 +135,7 @@ class QA_CNN_extend(object):
                     name="poll-1"
             )
             pooled_outputs.append(pooled) 
-            pooled_reshape = tf.reshape(tf.concat(3, pooled_outputs), [-1, self.num_filters_total])  
+        pooled_reshape = tf.reshape(tf.concat(3, pooled_outputs), [-1, self.num_filters_total])  
         return pooled_reshape
 
     def getFeatureMapWithPooling(self,embedding,right=True):
@@ -155,7 +156,7 @@ class QA_CNN_extend(object):
             cnn_outputs.append(h)
             
             # cnn_reshaped = tf.reshape(tf.concat(3, cnn_outputs), [-1, self.num_filters_total]) 
-            cnn_reshaped = tf.concat(3, cnn_outputs)
+        cnn_reshaped = tf.concat(3, cnn_outputs)
         return cnn_reshaped
 
     def getCosine(self,q,a):
@@ -206,17 +207,17 @@ if __name__ == '__main__':
         dropout_keep_prob = 1.0,
         embeddings = None,
         l2_reg_lambda=0.0,
-        overlap_needed = False,
+        overlap_needed = True,
         trainable = True,
         extend_feature_dim = 10)
     input_x_1 = np.reshape(np.arange(3 * 33),[3,33])
     input_x_2 = np.reshape(np.arange(3 * 40),[3,40])
     input_x_3 = np.reshape(np.arange(3 * 40),[3,40])
 
-    q_pos_embedding = np.reshape(np.arange(3 * 33 * 10),[3,33,10])
-    q_neg_embedding = np.reshape(np.arange(3 * 33 * 10),[3,33,10])
-    a_pos_embedding = np.reshape(np.arange(3 * 40 * 10),[3,40,10])
-    a_neg_embedding = np.reshape(np.arange(3 * 40 * 10),[3,40,10])    
+    q_pos_embedding = np.ones((3,33))
+    q_neg_embedding = np.ones((3,33))
+    a_pos_embedding = np.ones((3,40))
+    a_neg_embedding = np.ones((3,40))    
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         feed_dict = {
@@ -229,7 +230,6 @@ if __name__ == '__main__':
             cnn.a_neg_overlap:a_neg_embedding
 
         }
-       
         question,answer,score = sess.run([cnn.question,cnn.answer,cnn.score12],feed_dict)
         print question.shape,answer.shape
         print score 

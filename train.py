@@ -5,7 +5,7 @@ import numpy as np
 import os
 import time
 import datetime
-from data_helpers import get_overlap_dict,replace_number,sample_data,batch_gen_with_pair_overlap,batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,parseData,batch_gen_with_pair_whole
+from data_helpers import get_overlap_dict,replace_number,sample_data,batch_gen_with_pair_overlap,batch_gen_with_pair_dns,dns_sample,load,prepare,batch_gen_with_pair,batch_gen_with_single,batch_gen_with_point_wise,getQAIndiceofTest,batch_gen_with_pair_whole
 import operator
 from QA_CNN_point_wise import QA
 from QA_CNN_pair_wise import QA_CNN
@@ -52,7 +52,7 @@ tf.flags.DEFINE_string("loss","pair_wise","loss function (default:point_wise)")
 tf.flags.DEFINE_integer('extend_feature_dim',10,'overlap_feature_dim')
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
-tf.flags.DEFINE_boolean("trainable", True, "is embedding trainable? (default: False)")
+tf.flags.DEFINE_boolean("trainable", False, "is embedding trainable? (default: False)")
 tf.flags.DEFINE_integer("num_epochs", 500, "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("evaluate_every", 500, "Evaluate model on dev set after this many steps (default: 100)")
 tf.flags.DEFINE_integer("checkpoint_every", 500, "Save model after this many steps (default: 100)")
@@ -166,8 +166,8 @@ def test_point_wise():
                             cnn.answer: x_right_batch,
                             cnn.input_y: y_batch
                         }
-                        _, step,loss, accuracy,pred ,scores = sess.run(
-                        [train_op, global_step,cnn.loss, cnn.accuracy,cnn.predictions,cnn.scores],
+                        _, step,loss, accuracy,pred ,scores,see = sess.run(
+                        [train_op, global_step,cnn.loss, cnn.accuracy,cnn.predictions,cnn.scores,cnn.see],
                         feed_dict)
                         time_str = datetime.datetime.now().isoformat()
                        
@@ -181,23 +181,22 @@ def test_point_wise():
                             cnn.overlap:overlap,
                             cnn.input_y: y_batch
                         }
-                        _, step,loss, accuracy,pred ,scores = sess.run(
-                        [train_op, global_step,cnn.loss, cnn.accuracy,cnn.predictions,cnn.scores],
+                        _, step,loss, accuracy,pred ,scores ,see= sess.run(
+                        [train_op, global_step,cnn.loss, cnn.accuracy,cnn.predictions,cnn.scores,cnn.see],
                         feed_dict)
                         time_str = datetime.datetime.now().isoformat()
-                       
                         print("{}: step {}, loss {:g}, acc {:g}  ".format(time_str, step, loss, accuracy))
                     # print loss
-                # predicted_train = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                # predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                # map_mrr_train = evaluation.evaluationBypandas(train,predicted[:,-1])
+                predicted_train = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+                predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
+                map_mrr_train = evaluation.evaluationBypandas(train,predicted[:,-1])
                 predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 map_mrr_test = evaluation.evaluationBypandas(test,predicted[:,-1])
                 # predicted = predict(sess,cnn,dev,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
                 # map_mrr_dev = evaluation.evaluationBypandas(dev,predicted[:,-1])
                 # map_mrr_train = evaluation.evaluationBypandas(train,predicted_train[:,-1])
                 # print evaluation.evaluationBypandas(train,predicted_train[:,-1])
-                # print "{}:train epoch:map mrr {}".format(i,map_mrr_train)
+                print "{}:train epoch:map mrr {}".format(i,map_mrr_train)
                 print "{}:test epoch:map mrr {}".format(i,map_mrr_test)
                 # print "{}:dev epoch:map mrr {}".format(i,map_mrr_dev)
                 # line = " {}:epoch: map_train{}----map_test{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_test[0],map_mrr_dev[0])
@@ -209,17 +208,18 @@ def test_point_wise():
 @log_time_delta
 def test_pair_wise(dns = FLAGS.dns):
     train,test,dev,submit = load(FLAGS.data,filter = False)
-    train = train.dropna(axis = 0)
-    test = test.dropna(axis = 0)
-    dev = dev.dropna(axis = 0)
-    submit = submit.dropna(axis = 0)
+    train = train.fillna('')
+    test = test.fillna('')
+    dev = dev.fillna('')
+    submit = submit.fillna('')
     # replace_number([train,test,dev])
     # train = sample_data(train,frac = FLAGS.sample_train)
     # test = sample_data(train,frac = FLAGS.sample_train)
     # dev = sample_data(dev,frac = FLAGS.sample_train)
-    # train = train[:1000]
-    # test = test[:1000]
-    # dev = dev[:1000]
+    train = train[:1000]
+    test = test[:1000]
+    dev = dev[:1000]
+    submit = submit[:1000]
     q_max_sent_length = 40#max(map(lambda x:len(x),train['question'].str.split()))
     a_max_sent_length = 75#max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
@@ -279,6 +279,7 @@ def test_pair_wise(dns = FLAGS.dns):
                 print map_mrr_test
             # seq_process(train, alphabet)
             # seq_process(test, alphabet)
+            '''
             print 'get my submit result'
             loadfile="runs/20170604/20170604183633__nlpcc0.833940715393"
             saver.restore(sess, loadfile)
@@ -298,7 +299,7 @@ def test_pair_wise(dns = FLAGS.dns):
             submit['predicted'].to_csv('train.QApair.TJU_IR_QA2017_submit.score',index = False,sep = '\t')
             print 'predict over'
 
-
+            '''
             map_max = 0.65
             for i in range(1000):
                 if dns ==True:

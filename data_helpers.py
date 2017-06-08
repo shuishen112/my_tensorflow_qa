@@ -15,7 +15,9 @@ from features import overlap_jiabing,overlap_index
 import string
 import jieba
 from nltk import stem
+from tqdm import tqdm
 import chardet
+import re
 PUNCT = set(string.punctuation) - set('$%#')
 print PUNCT
 cores = multiprocessing.cpu_count()
@@ -24,8 +26,23 @@ UNKNOWN_WORD_IDX = 0
 is_stemmed_needed = False
 stopwords = { word.decode("utf-8") for word in open("model/chStopWordsSimple.txt").read().split()}
 # names = {word for word in open('names.txt').read().split()}
-
+ner_dict = pickle.load(open('ner_dict'))
 from functools import wraps
+#w2v=models.word2vec.Word2Vec.load("embedding.txt")
+types=["number","time","organization","person","place","others"]
+#number
+pattern_1 = re.compile(u".*(第)?(几|(多(少(?!年)|大|小|(长(?!时间))|短|高|低|矮|远|近|厚|薄))).*")
+#time
+pattern_2 = re.compile(u".*((哪一?(年|月|天|日)|(什么时(候|间))|(多久)|(时间是)|(多长时间)|(多少年))).*")
+#organization
+pattern_3 = re.compile(u".*(((什么)|(哪(一|两|三|几|些)?(个|家)?)).{0,3}(班底|前身|团|公司|企业|组织|集团|机构|学校|基地|媒体|开发商|商场|购物中心|工作室)|((班底|前身|团|公司|企业|组织|集团|机构|学校|大学|基地|媒体|开发商|商场|购物中心|工作室)(是|叫))).*")
+#person
+pattern_4 = re.compile(u".*((什么名字)|((?<!开发商是)谁)|((哪(一|两|三|几|些)?)(个|位)?(人才?|作家|作者|演员|皇帝|主持人|统治者|角色|主角|名字?|主席))|((人|作家|作者|演员|皇帝|主持人|统治者|主席|角色|主角|名字?|子|儿)(是|((叫|演)什么)))).*")
+#place
+pattern_5 = re.compile(u".*(((什么|哪)(一|两|三|几|些)?(个|座)?(里|地方|地区|国家?|城?市|县|村|州|洲|行政区))|(在哪(?!((一|两|三|几|些)?(场|次|个|集|批|级|部|播出|网站))))|(是哪(?![\u4e00-\u9fa5]))).*")
+
+pattern_number = re.compile(u".*(([\d]+)|([零一二两俩三仨四五六七八九十百千万亿壹贰叁肆伍陆柒捌玖拾佰仟萬]+)).*")
+pattern_time = re.compile(u".*(([春夏秋冬])|(((([\d]+)|([零一二两三四五六七八九十百千万亿]+))[年月日天时点刻分秒]))).*")
 #print( tf.__version__)
 def log_time_delta(func):
     @wraps(func)
@@ -37,9 +54,7 @@ def log_time_delta(func):
         print( "%s runed %.2f seconds"% (func.__name__,delta))
         return ret
     return _deco
-
-
-isEnglish = False
+isEnglish = True
 if is_stemmed_needed:
     stemmer = stem.lancaster.LancasterStemmer()
 class Alphabet(dict):
@@ -109,7 +124,7 @@ def load_text_vec(alphabet,filename="",embedding_size = 100):
         for line in f:
             i+=1
             if i % 100000 == 0:
-                    print 'epch %d' % i
+                print 'epch %d' % i
             items = line.strip().split(' ')
             if len(items) == 2:
                 vocab_size, embedding_size= items[0],items[1]
@@ -118,6 +133,22 @@ def load_text_vec(alphabet,filename="",embedding_size = 100):
                 word = items[0]
                 if word in alphabet:
                     vectors[word] = items[1:]
+    print 'embedding_size',embedding_size
+    print 'done'
+    print 'words found in wor2vec embedding ',len(vectors.keys())
+    return vectors
+def load_test_vec_fudan(alphabet,filename = "",embedding_size = 100):
+    vectors = {}
+    with open(filename) as f:
+        i = 0
+        for line in f:
+            i += 1
+            if i % 100000 == 0:
+                print 'epoch %d' % i
+                items = line.strip().split('\t')
+                word = items[0]
+                if word in alphabet:
+                    vectors[word] = items[1]
     print 'embedding_size',embedding_size
     print 'done'
     print 'words found in wor2vec embedding ',len(vectors.keys())
@@ -203,19 +234,6 @@ def batch_gen_with_single_attentive(df,alphabet,batch_size = 10,q_len = 33,a_len
         yield [[pair[j] for pair in batch]  for j in range(2)]
     batch= pairs[n_batches*batch_size:] + [pairs[n_batches*batch_size]] * (batch_size- len(pairs)+n_batches*batch_size  )
     yield [[pair[i] for pair in batch]  for i in range(2)]
-# this is for trec,wiki data
-def parseData(df,alphabet,q_len = 33,a_len = 40):
-    q = []
-    a = []
-    overlap = []
-    for index,row in df.iterrows():
-        question = encode_to_split(row["question"],alphabet,max_sentence = q_len)
-        answer = encode_to_split(row["answer"],alphabet,max_sentence = a_len)
-        lap = overlap_jiabing(row)
-        q.append(question)
-        a.append(answer)
-        overlap.append(lap)
-    return q,a,overlap
 @log_time_delta
 def batch_gen_with_point_wise(df,alphabet, batch_size=10,overlap = False,q_len = 33,a_len = 40):
     #inputq inputa intput_y overlap
@@ -253,7 +271,7 @@ def batch_gen_with_pair(df,alphabet, batch_size=10,q_len = 40,a_len = 40):
         question_indices = encode_to_split(question,alphabet,max_sentence = q_len)
         for pos in pos_answers:
             if len(neg_answers.index)>0:
-                neg_index=np.random.choice(neg_answers.index)
+                neg_index = np.random.choice(neg_answers.index)
 
                 neg= neg_answers.loc[neg_index,]["answer"]
 
@@ -266,6 +284,7 @@ def batch_gen_with_pair(df,alphabet, batch_size=10,q_len = 40,a_len = 40):
     for i in range(0,n_batches):
         batch = pairs[i*batch_size:(i+1) * batch_size]
         yield [[pair[i] for pair in batch]  for i in range(3)]
+# calculate the overlap_index
 def overlap_index(question,answer,q_len,a_len,stopwords = []):
     qset = set(cut(question))
     aset = set(cut(answer))
@@ -285,26 +304,9 @@ def overlap_index(question,answer,q_len,a_len,stopwords = []):
             value = 2
         a_index[i] = value
     return q_index,a_index
-def batch_gen(df,alphabet, batch_size = 10,q_len = 40,a_len = 40):
-    pairs=[]
-    for question in df["question"].unique():
-        group= df[df["question"]==question]
-        pos_answers = group[df["flag"]==1]["answer"]
-        neg_answers = group[df["flag"]==0]["answer"].reset_index()
-        question_indices = encode_to_split(question,alphabet,max_sentence = q_len)
-        for pos in pos_answers:
-            if len(neg_answers.index)>0:
-                    neg_index=np.random.choice(neg_answers.index)
 @log_time_delta
 def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 40,fresh = True,overlap_dict = None):
     pairs=[]
-    # file = 'model/overlap.dict'
-    # if os.path.exists(file):
-    #     print 'load overlap'
-    #     d = pickle.load(open(file,'r'))
-    # else:
-    #     print 'calculate overlap'
-    #     d = get_overlap_dict(df,alphabet,q_len,a_len)
     start = time.time()
     for question in df["question"].unique():
         group= df[df["question"]==question]
@@ -333,22 +335,6 @@ def batch_gen_with_pair_overlap(df,alphabet, batch_size = 10,q_len = 40,a_len = 
     for i in range(0,n_batches):
         batch = pairs[i*batch_size:(i+1) * batch_size]
         yield [[pair[i] for pair in batch]  for i in range(7)]
-'''
-@log_time_delta
-def get_overlap_dict(df,alphabet,q_len = 40,a_len = 40):
-    d = dict()
-    for question in df['question'].unique():
-        group = df[df['question'] == question]
-        pos_answers = group[df["flag"]==1]["answer"]
-        neg_answers = group[df["flag"]==0]["answer"]
-        for pos in pos_answers:
-            for neg in neg_answers:
-                q_pos_overlap,a_pos_overlap = overlap_index(question,pos,q_len,a_len)
-                d[(question,pos)] = (q_pos_overlap,a_pos_overlap)
-                q_neg_overlap,a_neg_overlap = overlap_index(question,neg,q_len,a_len)
-                d[(question,neg)] = (q_neg_overlap,a_neg_overlap)
-    return d
-'''
 @log_time_delta
 def get_overlap_dict(df,alphabet,q_len = 40,a_len = 40):
     d = dict()
@@ -359,25 +345,6 @@ def get_overlap_dict(df,alphabet,q_len = 40,a_len = 40):
             q_overlap,a_overlap = overlap_index(question,ans,q_len,a_len)
             d[(question,ans)] = (q_overlap,a_overlap)
     return d
-def batch_gen_with_overlap(df,alphabet,batch_size = 10,qlen = 40,a_len = 40):
-    pairs = get_raw_pairs(df)
-    overlap = []
-    for question,pos,neg in pairs:
-        q_pos_overlap_index,a_pos_overlap_index = overlap_index(question,pos,q_len,a_len)
-        q_neg_overlap_index,a_neg_overlap_index = overlap_index(question,neg,q_len,a_len)
-def batch_gen_with_pare_output_feature(df,alphabet,batch_size = 10,q_len = 40,a_len = 40):
-    pairs = get_raw_pairs(df)
-
-    overlap = []
-    for question,pos,neg in pairs:
-        q_pos_overlap_index,a_pos_overlap_index = overlap_index(question,pos,q_len,a_len)
-        q_neg_overlap_index,a_neg_overlap_index = overlap_index(question,neg,q_len,a_len)    # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
-    n_batches= int(len(pairs)*1.0/batch_size)
-    pairs = sklearn.utils.shuffle(pairs,random_state =132)
-
-    for i in range(0,n_batches):
-        batch = pairs[i*batch_size:(i+1) * batch_size]
-        yield ([pair[i] for pair in batch]  for i in range(3))
 def batch_gen_with_pair_whole(df,alphabet, batch_size = 10,q_len = 40,a_len = 40):
     pairs=[]
     for question in df["question"].unique():
@@ -397,44 +364,6 @@ def batch_gen_with_pair_whole(df,alphabet, batch_size = 10,q_len = 40,a_len = 40
     for i in range(0,n_batches):
         batch = pairs[i*batch_size:(i+1) * batch_size]
         yield ([pair[i] for pair in batch]  for i in range(3))
-def batch_gen_with_pair_test(df,alphabet, batch_size=10):
-    pairs=[]
-    for question in df["question"].unique():
-        group= df[df["question"]==question]["answer"]
-        question_indices=encode_to_split(question,alphabet)
-        for pos in group:
-            pairs.append((question_indices,encode_to_split(pos,alphabet),encode_to_split(pos,alphabet)))
-    # n_batches= int(math.ceil(df["flag"].sum()*1.0/batch_size))
-    n_batches= int(len(pairs)*1.0/batch_size)
-
-    for i in range(0,n_batches-1):
-        batch = pairs[i*batch_size:(i+1) * batch_size]
-        yield ([pair[i] for pair in batch]  for i in range(3))
-
-
-def batch_gen(X, batch_size):
-    n_batches = X.shape[0]/float(batch_size)
-    n_batches = int(math.ceil(n_batches))
-    end = int(X.shape[0]/float(batch_size)) * batch_size
-    n = 0
-    for i in range(0,n_batches):
-        if i < n_batches - 1:
-            if len(X.shape) > 1:
-                batch = X[i*batch_size:(i+1) * batch_size, :]
-                yield batch
-            else:
-                batch = X[i*batch_size:(i+1) * batch_size]
-                yield batch
-
-        else:
-            if len(X.shape) > 1:
-                batch = X[end: , :]
-                n += X[end:, :].shape[0]
-                yield batch
-            else:
-                batch = X[end:]
-                n += X[end:].shape[0]
-                yield batch
 def removeUnanswerdQuestion(df):
     counter= df.groupby("question").apply(lambda group: sum(group["flag"]))
     questions_have_correct=counter[counter>0].index
@@ -446,30 +375,19 @@ def removeUnanswerdQuestion(df):
     return df[df["question"].isin(questions_have_correct) &  df["question"].isin(questions_have_correct) & df["question"].isin(questions_have_uncorrect)].reset_index()
 
 def load(dataset = dataset, filter = False):
-
-    data_dir="data/"+dataset
-    train_file=os.path.join(data_dir,"train.txt")
-    test_file=os.path.join(data_dir,"test.txt")
-    dev_file = os.path.join(data_dir,'dev.txt')
+    data_dir = "data/" + dataset
+    datas = []
+    for data_name in ['train.txt','test.txt','dev.txt']:
+        data_file = os.path.join(data_dir,data_name)
+        data = pd.read_csv(data_file,header = None,sep="\t",names=["question","answer","flag"],quoting =3)
+        if filter == True:
+            datas.append(removeUnanswerdQuestion(data))
+        else:
+            datas.append(data)
     sub_file = os.path.join(data_dir,'submit.txt')
-    
-
-    # train=pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
-    test = pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
-    dev = pd.read_csv(dev_file,header = None,sep = '\t',names = ['question','answer','flag'],quoting = 3)
-    if dataset == 'trec':
-        train_all_file = os.path.join(data_dir,"train-all.txt")
-        train_all = pd.read_csv(train_all_file,header = None,sep = '\t',names = ['qid1','qid2',
-        'question','answer','flag'],quoting = 3)
-        train = train_all[['question','answer','flag']]
-    else:
-        train = pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
-    submit = pd.read_csv(sub_file,header = None,sep = '\t',names = ['question','answer'],quoting = 3)
-
-    if filter == True:
-        return removeUnanswerdQuestion(train),removeUnanswerdQuestion(test),removeUnanswerdQuestion(dev)
-    return train,test,dev,submit
-
+    submit = pd.read_csv(sub_file,header = None,sep = "\t",names = ['question','answer','flag'],quoting = 3)
+    datas.append(submit)
+    return tuple(datas)
 def sentence_index(sen, alphabet, input_lens):
     sen = sen.split()
     sen_index = []
@@ -480,8 +398,6 @@ def sentence_index(sen, alphabet, input_lens):
         sen_index += sen_index[:(input_lens - len(sen_index))]
 
     return np.array(sen_index), len(sen)
-
-
 def getSubVectorsFromDict(vectors,vocab,dim = 300):
     file = open('missword','w')
     embedding = np.zeros((len(vocab),dim))
@@ -532,22 +448,6 @@ def getQAIndiceofTest(df,alphabet,max_lenght=50):
     questions = pool.map(Seq_gener(alphabet,max_lenght),df["question"])
     answers = pool.map(Seq_gener(alphabet,max_lenght),df["answer"])
     return [np.array(questions),np.array(answers)]
-def load_another(dataset = dataset, filter=False):
-
-    data_dir="data/"+dataset
-    train_file=os.path.join(data_dir,"train.rm_stop_txt")
-    test_file=os.path.join(data_dir,"test.rm_stop_txt")
-    dev_file = os.path.join(data_dir,'dev.rm_stop_txt')
-    
-
-    train=pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
-    test=pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
-    dev = pd.read_csv(dev_file,header = None,sep = '\t',names = ['question','answer','flag'],quoting = 3)
-    
-
-    if filter == True:
-        return removeUnanswerdQuestion(train),removeUnanswerdQuestion(test),removeUnanswerdQuestion(dev)
-    return train,test,dev
 @log_time_delta
 def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
     vocab_file = 'model/voc'
@@ -561,14 +461,7 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
         count = 0
         for corpus in cropuses:
             for texts in [corpus["question"].unique(),corpus["answer"]]:
-                # pool = multiprocessing.Pool(cores)
-                # # pool.map(add_to_alphabet,texts,alphabet)
-                # tokens = pool.map(cut,texts)
-                # merged = list(itertools.chain(*tokens))
-                # print 'tokens',len(merged)
-                # for token in set(merged):
-                #     alphabet.add(token)
-                for sentence in texts:   
+                for sentence in tqdm(texts):   
                     count += 1
                     if count % 10000 == 0:
                         print count
@@ -601,8 +494,8 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
                     embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
                     sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             else:
-                fname = 'model/wiki.ch.text.vector'
-                embeddings = load_text_vec(alphabet,fname,embedding_size = dim)
+                fname = 'model/embedding.300'
+                embeddings = load_test_vec_fudan(alphabet,fname,embedding_size = dim)
                 sub_embeddings = getSubVectorsFromDict(embeddings,alphabet,dim)
             pickle.dump(sub_embeddings,open(sub_vec_file,'w'))
         # print (len(alphabet.keys()))
@@ -621,190 +514,7 @@ def seq_process(df,alphabet):
     df["answer_seq"]= df["answer"].apply( gen_seq)
 def gen_seq_fun(text,alphabet):
     return ([ alphabet[str(word)] for word in text.lower().split() ]  +[alphabet["END"]] *(max_lenght-len(text.split())))[:max_lenght]
-def getDataFolexdecomp():
-    train,test,dev = load("trec",filter=True)
-    alphabet,embeddings = prepare([train,test,dev],is_embedding_needed = True)
-    print 'load finished'
-    voc = open('GoogleNews-vectors-50d.voc','w')
-    for key in alphabet:
-        voc.write(key+'\n')
-    np.save('GoogleNews-vectors-50d',embeddings)
-    print 'save finished'
 # load data for trec sigar 2015
-
-def get_alphabet(corpuses):
-    alphabet = Alphabet(start_feature_id = 0)
-    alphabet.add('UNKNOWN_WORD_IDX')
-    for corpus in corpuses:
-        for texts in [corpus["question"],corpus["answer"]]:
-            for sentence in texts:
-                tokens = sentence.lower().split()
-                for token in sentence.lower().split():
-                    if is_stemmed_needed:
-                        alphabet.add(stemmer.stem(token.decode('utf-8')))
-                    else:
-                        alphabet.add(token)
-    print len(alphabet)  
-    return alphabet
-def compute_df(corpus):
-    word2df = defaultdict(float)
-    numdoc = len(corpus['question']) + len(corpus['answer'])
-    for texts in [corpus['question'].unique(),corpus['answer']]:
-        for sentence in texts:
-            tokens = sentence.lower().split()
-            for w in set(tokens):
-                word2df[w] += 1.0;
-
-
-    for w,value in word2df.iteritems():
-        word2df[w] /= np.math.log(numdoc / value) 
-    return word2df
-
-
-#get onerlap
-def compute_overlap_features(dataset,stoplist = None,word2df = None):
-
-    word2df = word2df if word2df else {}
-    stoplist = stoplist if stoplist else set()
-    question = dataset['question'].lower().split()
-    answer = dataset['answer'].lower().split()
-    q_set = set([q for q in question if q not in stoplist])
-    a_set = set([a for a in answer if a not in stoplist])
-    word_overlap = q_set.intersection(a_set)
-    overlap = float(len(word_overlap)) / (len(q_set) + len(a_set))
-    word_overlap = q_set.intersection(a_set)
-    df_overlap = 0.0
-    for w in word_overlap:
-        df_overlap += word2df[w]
-    df_overlap /= (len(q_set) + len(a_set))
-
-    feats_overlap = np.array([overlap,df_overlap])
-    return [overlap,df_overlap] * 2
-def compute_overlap_idx(dataset, stoplist, q_max_sent_length, a_max_sent_length):
-    stoplist = stoplist if stoplist else set()
-    questions = dataset['question'].str.split()
-    answers = dataset['answer'].str.split()
-    q_indices, a_indices = [], []
-    for question,answer in zip(questions,answers):    
-        q_set = [q.lower() for q in question if q not in stoplist]
-        a_set = [a.lower() for a in answer if a not in stoplist]
-        word_overlap = set(q_set).intersection(set(a_set))
-
-        # question index
-        q_idx = np.ones(q_max_sent_length) * 2
-        for i,q in enumerate(question):
-            value = 0
-            if q in word_overlap:
-                value = 1
-            q_idx[i] = value
-
-        q_indices.append(q_idx)
-        a_idx = np.ones(a_max_sent_length) * 2
-        # answer index
-        for i,a in enumerate(answer):
-            value = 0
-            if a in word_overlap:
-                value = 1
-            a_idx[i] = value
-        a_indices.append(a_idx)
-    q_indices = np.vstack(q_indices).astype('int32')
-    a_indices = np.vstack(a_indices).astype('int32')
-    return q_indices,a_indices
-def convert2indices(dataset,alphabet,dummy_word_idx,max_sent_length=40):
-    data_idx = []
-    sentences = dataset.str.split()
-    for sentence in sentences:
-        ex = np.ones(max_sent_length) * dummy_word_idx
-        for i,token in enumerate(sentence):
-            idx = alphabet.get(token.lower(), UNKNOWN_WORD_IDX)
-            ex[i] = idx
-        data_idx.append(ex)
-    data_idx = np.asarray(data_idx).astype('int32')
-    return data_idx
-
-def loadData(dataset = dataset):
-    data_dir = "data/"+dataset
-    train_file = os.path.join(data_dir,"train.txt")
-    test_file = os.path.join(data_dir,'test.txt')
-    dev_file = os.path.join(data_dir,'dev.txt')
-    train = pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
-    test = pd.read_csv(test_file,header = None,sep = '\t',names = ['question','answer','flag'],quoting = 3)
-    dev = pd.read_csv(dev_file,header = None,sep = '\t',names = ['question','answer','flag'],quoting = 3)
-
-    alphabet = get_alphabet([train,test,dev])
-
-    cPickle.dump(alphabet, open(os.path.join(data_dir, 'vocab.pickle'), 'w'))
-    all_file = pd.concat([train,test,dev])
-    q_max_sent_length = max(map(lambda x:len(x),all_file['question'].str.split()))
-    a_max_sent_length = max(map(lambda x:len(x),all_file['answer'].str.split()))
-    word2dfs = compute_df(all_file)
-
-    print 'q_max_sent_length', q_max_sent_length
-    print 'a_max_sent_length', a_max_sent_length
-    print 'alphabet',len(alphabet)
-    
-
-    for fname in [train_file,dev_file,test_file]:
-        dataset = pd.read_csv(fname,header = None,sep = '\t',names = ['question','answer','flag'],quoting = 3)
-        dataset['overlapfeats'] = dataset.apply(compute_overlap_features,word2df = word2dfs, axis = 1)  
-        question2id = dict()
-        for index, question in enumerate(dataset['question'].unique()):
-            question2id[question] = index
-        dataset['qid'] = dataset.apply(lambda row:question2id[row['question']],axis = 1)
-
-        # dataset['qa_overlap_indices'] = dataset.apply(compute_overlap_idx,stoplist = None,
-        #     q_max_sent_length = q_max_sent_length,a_max_sent_length = a_max_sent_length,axis = 1)
-        q_overlap_indices,a_overlap_indices = compute_overlap_idx(dataset,stoplist = None,q_max_sent_length = q_max_sent_length,
-            a_max_sent_length = a_max_sent_length)
-        questions_idx = convert2indices(dataset['question'],alphabet = alphabet,
-            dummy_word_idx = alphabet.fid,max_sent_length = q_max_sent_length)
-        answers_idx = convert2indices(dataset['answer'],alphabet = alphabet,
-            dummy_word_idx = alphabet.fid,max_sent_length = a_max_sent_length)
-        print 'answers_idx', answers_idx.shape
-
-        qids = np.array(dataset['qid']).astype('int32')
-        flags = np.array(dataset['flag']).astype('int32')
-        overlapfeats = np.array(dataset['overlapfeats'])
-        overlapfeats = np.vstack(overlapfeats).astype('int32')
-
-        basename,_ = os.path.splitext(os.path.basename(fname))
-
-        print 'qids shape',qids.shape
-        print 'flags shape',flags.shape
-        print 'question shape',questions_idx.shape
-        print questions_idx
-        exit()
-        print 'answer shape',answers_idx.shape
-        print 'overlap_feats shape',overlapfeats.shape
-
-        print 'q_overlap_indices shape',q_overlap_indices.shape
-        print 'a_overlap_indices shape',a_overlap_indices.shape
-
-        np.save(os.path.join(data_dir, '{}.qids.npy'.format(basename)), qids)
-        np.save(os.path.join(data_dir, '{}.questions.npy'.format(basename)), questions_idx)
-        np.save(os.path.join(data_dir, '{}.answers.npy'.format(basename)), answers_idx)
-        np.save(os.path.join(data_dir, '{}.labels.npy'.format(basename)), flags)
-        np.save(os.path.join(data_dir, '{}.overlap_feats.npy'.format(basename)), overlapfeats)
-
-        np.save(os.path.join(data_dir, '{}.q_overlap_indices.npy'.format(basename)), q_overlap_indices)
-        np.save(os.path.join(data_dir, '{}.a_overlap_indices.npy'.format(basename)), a_overlap_indices)
-
-
-        # print 'questions',len(dataset['qid'].unique())
-
-        # questions_idx = np.array(dataset['questions_answers_idx']).shape
-   
-        
-       
-        
-  
-
-    # question2id = dict()
-    # for index,q in enumerate(all_file['question'].unique()):
-    #     question2id[q] = index
-    # all_file['qids'] = all_file.apply(lambda row:question2id[row['question']],axis = 1)
-
-
 def data_processing():
     train,test,dev = load('nlpcc',filter = True)
     replace_number([train,test,dev])
@@ -992,16 +702,6 @@ def replace_number(data):
         df['answer'] = df['answer'].str.replace(r'[A-Za-z]+','')
         df['answer'] = df['answer'].str.replace(r'[\d]+','')
         # df = df.dropna(axis = 0)
-def deal_nan(dataset):
-    data_dir="data/"+dataset
-    train_file=os.path.join(data_dir,"train.txt")
-    test_file=os.path.join(data_dir,"test.txt")
-    dev_file = os.path.join(data_dir,'dev.txt')
-    
-
-    train=pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
-    test=pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
-    dev = pd.read_csv(dev_file,header = None,sep = '\t',names = ['question','answer','flag'],quoting = 3)
 def position_apply1(row):
     question =cut_word(row["question"]) 
     answer = cut_word(row["answer"]) 
@@ -1010,7 +710,6 @@ def position_apply1(row):
         if q_item in answer:
             align[i]=1
     colums_names=["p"+str(i) for i in range(len(question))]
-    
     return pd.Series(align,index=colums_names)
 def ma_overlap_zi(row):
     question = cut(row["question"])
@@ -1051,15 +750,43 @@ def ma_overlap(row):
     for k in overlap:
         weight_all += weight_position[k]
     return weight_all 
-def get_feature():
-    train,test,dev = load("nlpcc",filter = False)
-    train = train.dropna(axis = 0)
-    test = test.dropna(axis = 0)
-    dev = dev.dropna(axis = 0)
-    test = test.reindex(np.random.permutation(test.index))
+def type2(row):
 
-    test['pred'] = test.apply(ma_overlap,axis = 1)
-    print evaluation.evaluationBypandas(test,test['pred'])
+
+    type_array=np.zeros(5)
+    question=row["question"]
+    answer=str(row["answer"])
+    #print question+":",
+    q_type=questionType(question)
+    # print "%s -> %s " %(question,q_type) ,
+    # print answer+":",
+    if q_type=="others":
+        return 0
+    elif q_type=="number":
+        if pattern_number.match(answer.decode("utf-8")) :
+            # print "number"
+            return 1
+    elif q_type=="time":
+
+        if pattern_time.match(answer.decode("utf-8")):
+            # print "time"
+            return 2
+    else:
+        if ner_dict.has_key(answer):
+            
+            ner_info= ner_dict[answer]
+            # print ner_info,
+            if q_type == 'organization':
+                if 'organization/group name' in ner_info:
+                    return 3
+            elif q_type == "person":
+                if "personal name" in ner_info or 'transcribed personal name' in ner_info:
+                    return 4
+            elif q_type == "place":
+                if "toponym" in ner_info or 'locative word' in ner_info or 'transcribed toponym' in ner_info:
+                    # print "place"
+                    return 5
+    return 0
 def type(row):
     type_array = np.zeros(5)
     question=row["question"]
@@ -1079,7 +806,7 @@ def type(row):
                 return 2
         elif q_type == 'organization':
             if 'organization/group name' in ner_info:
-                return 3;
+                return 3
         elif q_type == "person":
             if "personal name" in ner_info or 'transcribed personal name' in ner_info:
                 return 4
@@ -1094,12 +821,37 @@ def model_mixed():
     data_dir = "data/" + 'nlpcc'
     test_file = os.path.join(data_dir,"test.txt")
     test = pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
-    predicted = pd.read_csv('train.QApair.Tju_IR_QA.score',names = ['score'])
+    predicted = pd.read_csv('../QA/train.QApair.TJU_IR_QA.score',names = ['score'])
     map_mrr_test = evaluation.evaluationBypandas(test,predicted)
-
     print map_mrr_test
+def questionType(sentence):
+
+    sentence=sentence.decode("utf-8")
+
+    if pattern_1.match(sentence):
+        num = 0
+    elif pattern_2.match(sentence):
+        num = 1
+    elif pattern_3.match(sentence):
+        num = 2
+    elif pattern_4.match(sentence):
+        num = 3
+    elif pattern_5.match(sentence):
+        num = 4
+    else:
+        num = 5
+
+    return types[num]
+def have_type():
+    data_dir = "data/" + 'nlpcc'
+    train_file = os.path.join(data_dir,'test_raw.txt')
+    train = pd.read_csv(train_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
+    train['type_score'] = train.apply(type2,axis = 1)
+    print train.groupby('type_score').size()
+    print train['type_score']
 if __name__ == '__main__':
     model_mixed()
+    # have_type()
     # get_feature()
     # data_processing()
     # exit()
