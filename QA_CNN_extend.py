@@ -36,7 +36,7 @@ class QA_CNN_extend(object):
         self.a_pos_overlap = tf.placeholder(tf.int32,[None,max_input_right],name = 'a_feature_embed')
         self.a_neg_overlap = tf.placeholder(tf.int32,[None,max_input_right],name = 'a_neg_feature_embed')
         with tf.name_scope('embedding'):
-            if embeddings != None:
+            if embeddings is not None:
                 print "load embedding"
                 W = tf.Variable(np.array(self.embeddings),name="W" ,dtype="float32",trainable = trainable)
                 
@@ -44,9 +44,6 @@ class QA_CNN_extend(object):
                 print "random embedding"
                 W = tf.Variable(tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),name="W",trainable = trainable)
             self.embedding_W = W
-            # a = np.zeros((3,self.extend_feature_dim),dtype = 'float32')
-            # a[1,:] = 1
-            # a[2,:] = 2
             self.overlap_W = tf.Variable(tf.random_uniform([3, self.extend_feature_dim], -1.0, 1.0),name="W",trainable = True)
             # self.overlap_W = tf.Variable(a,name="W",trainable = True)
             self.para.append(self.embedding_W)
@@ -74,13 +71,11 @@ class QA_CNN_extend(object):
             a_neg_embedding = self.getEmbedding(self.answer_negative,self.a_neg_overlap)
             embeddings=[q_pos_embedding,q_neg_embedding,a_pos_embedding,a_neg_embedding]
             if model_type=="qacnn":
-
                 q_pos_feature_map,q_neg_feature_map,a_pos_feature_map,a_neg_feature_map= [self.getFeatureMap(embedding,right=i/2) for i,embedding in enumerate(embeddings) ]
 
                 self.score12 = self.getCosine(q_pos_feature_map,a_pos_feature_map)
                 self.score13 = self.getCosine(q_neg_feature_map,a_neg_feature_map)
             elif model_type=="apn":
-
                 q_pos_feature_map,q_neg_feature_map,a_pos_feature_map,a_neg_feature_map= [self.getFeatureMapWithPooling(embedding,right=i/2) for i,embedding in enumerate(embeddings) ]
                 self.score12 = self.attentive_pooling(q_pos_feature_map,a_pos_feature_map)
                 self.score13 = self.attentive_pooling(q_neg_feature_map,a_neg_feature_map)
@@ -92,7 +87,7 @@ class QA_CNN_extend(object):
         for p in self.para:
             l2_loss += tf.nn.l2_loss(p)
         with tf.name_scope("loss"):
-            self.losses = tf.maximum(0.0, tf.sub(0.05, tf.sub(self.score12, self.score13)))
+            self.losses = tf.maximum(0.0, tf.subtract(0.05, tf.subtract(self.score12, self.score13)))
             self.loss = tf.reduce_sum(self.losses) + l2_reg_lambda * l2_loss
             
         # Accuracy
@@ -109,7 +104,7 @@ class QA_CNN_extend(object):
         if not self.overlap_needed:
             return  tf.expand_dims(embedded_chars_q,-1)
         overlap_embedding_q = tf.nn.embedding_lookup(self.overlap_W,overlap_indice)
-        return  tf.expand_dims(tf.concat(2,[embedded_chars_q,overlap_embedding_q]),-1)
+        return  tf.expand_dims(tf.concat([embedded_chars_q,overlap_embedding_q],2),-1)
 
     def getFeatureMap(self,embedding,right=True):
         if right==1:
@@ -135,7 +130,7 @@ class QA_CNN_extend(object):
                     name="poll-1"
             )
             pooled_outputs.append(pooled) 
-        pooled_reshape = tf.reshape(tf.concat(3, pooled_outputs), [-1, self.num_filters_total])  
+        pooled_reshape = tf.reshape(tf.concat(pooled_outputs,3), [-1, self.num_filters_total])  
         return pooled_reshape
 
     def getFeatureMapWithPooling(self,embedding,right=True):
@@ -156,17 +151,17 @@ class QA_CNN_extend(object):
             cnn_outputs.append(h)
             
             # cnn_reshaped = tf.reshape(tf.concat(3, cnn_outputs), [-1, self.num_filters_total]) 
-        cnn_reshaped = tf.concat(3, cnn_outputs)
+        cnn_reshaped = tf.concat(cnn_outputs,3)
         return cnn_reshaped
 
     def getCosine(self,q,a):
         pooled_flat_1 = tf.nn.dropout(q, self.dropout_keep_prob)
         pooled_flat_2 = tf.nn.dropout(a, self.dropout_keep_prob)
         
-        pooled_len_1 = tf.sqrt(tf.reduce_sum(tf.mul(pooled_flat_1, pooled_flat_1), 1)) 
-        pooled_len_2 = tf.sqrt(tf.reduce_sum(tf.mul(pooled_flat_2, pooled_flat_2), 1))
-        pooled_mul_12 = tf.reduce_sum(tf.mul(pooled_flat_1, pooled_flat_2), 1) 
-        score = tf.div(pooled_mul_12, tf.mul(pooled_len_1, pooled_len_2), name="scores") 
+        pooled_len_1 = tf.sqrt(tf.reduce_sum(tf.multiply(pooled_flat_1, pooled_flat_1), 1)) 
+        pooled_len_2 = tf.sqrt(tf.reduce_sum(tf.multiply(pooled_flat_2, pooled_flat_2), 1))
+        pooled_mul_12 = tf.reduce_sum(tf.multiply(pooled_flat_1, pooled_flat_2), 1) 
+        score = tf.div(pooled_mul_12, tf.multiply(pooled_len_1, pooled_len_2), name="scores") 
         return score    
         
     def attentive_pooling(self,input_left,input_right):
@@ -177,7 +172,7 @@ class QA_CNN_extend(object):
         # A,transpose_b = True),name = 'G')
         first = tf.matmul(tf.reshape(Q,[-1,len(self.filter_sizes) * self.num_filters]),self.U)
         second_step = tf.reshape(first,[self.batch_size,-1,len(self.filter_sizes) * self.num_filters])
-        result = tf.batch_matmul(second_step,tf.transpose(A,perm = [0,2,1]))
+        result = tf.matmul(second_step,tf.transpose(A,perm = [0,2,1]))
         G = tf.tanh(result)
         # column-wise pooling ,row-wise pooling
         row_pooling = tf.reduce_max(G,1,True,name = 'row_pooling')
@@ -189,9 +184,9 @@ class QA_CNN_extend(object):
         R_q = tf.reshape(tf.matmul(Q,attention_q,transpose_a = 1),[self.batch_size,self.num_filters * len(self.filter_sizes),-1],name = 'R_q')
         R_a = tf.reshape(tf.matmul(attention_a,A),[self.batch_size,self.num_filters * len(self.filter_sizes),-1],name = 'R_a')
 
-        norm_1 = tf.sqrt(tf.reduce_sum(tf.mul(R_q,R_q),1))
-        norm_2 = tf.sqrt(tf.reduce_sum(tf.mul(R_a,R_a),1))
-        score = tf.div(tf.reduce_sum(tf.mul(R_q,R_a),1),tf.mul(norm_1,norm_2))
+        norm_1 = tf.sqrt(tf.reduce_sum(tf.multiply(R_q,R_q),1))
+        norm_2 = tf.sqrt(tf.reduce_sum(tf.multiply(R_a,R_a),1))
+        score = tf.div(tf.reduce_sum(tf.multiply(R_q,R_a),1),tf.multiply(norm_1,norm_2))
         
         return score
 
@@ -228,7 +223,6 @@ if __name__ == '__main__':
             cnn.q_neg_overlap:q_neg_embedding,
             cnn.a_pos_overlap:a_pos_embedding,
             cnn.a_neg_overlap:a_neg_embedding
-
         }
         question,answer,score = sess.run([cnn.question,cnn.answer,cnn.score12],feed_dict)
         print question.shape,answer.shape

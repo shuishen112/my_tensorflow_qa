@@ -18,17 +18,16 @@ from nltk import stem
 from tqdm import tqdm
 import chardet
 import re
-PUNCT = set(string.punctuation) - set('$%#')
-print PUNCT
 cores = multiprocessing.cpu_count()
 dataset= "wiki"
+isEnglish = False
 UNKNOWN_WORD_IDX = 0
 is_stemmed_needed = False
 stopwords = { word.decode("utf-8") for word in open("model/chStopWordsSimple.txt").read().split()}
-# names = {word for word in open('names.txt').read().split()}
 ner_dict = pickle.load(open('ner_dict'))
+if is_stemmed_needed:
+    stemmer = stem.lancaster.LancasterStemmer()
 from functools import wraps
-#w2v=models.word2vec.Word2Vec.load("embedding.txt")
 types=["number","time","organization","person","place","others"]
 #number
 pattern_1 = re.compile(u".*(第)?(几|(多(少(?!年)|大|小|(长(?!时间))|短|高|低|矮|远|近|厚|薄))).*")
@@ -54,9 +53,6 @@ def log_time_delta(func):
         print( "%s runed %.2f seconds"% (func.__name__,delta))
         return ret
     return _deco
-isEnglish = True
-if is_stemmed_needed:
-    stemmer = stem.lancaster.LancasterStemmer()
 class Alphabet(dict):
     def __init__(self, start_feature_id = 1):
         self.fid = start_feature_id
@@ -120,9 +116,9 @@ def load_bin_vec(words,fname='embedding/GoogleNews-vectors-negative300.bin'):
 def load_text_vec(alphabet,filename="",embedding_size = 100):
     vectors = {}
     with open(filename) as f:
-        i=0
+        i = 0
         for line in f:
-            i+=1
+            i += 1
             if i % 100000 == 0:
                 print 'epch %d' % i
             items = line.strip().split(' ')
@@ -385,8 +381,8 @@ def load(dataset = dataset, filter = False):
         else:
             datas.append(data)
     sub_file = os.path.join(data_dir,'submit.txt')
-    submit = pd.read_csv(sub_file,header = None,sep = "\t",names = ['question','answer','flag'],quoting = 3)
-    datas.append(submit)
+    # submit = pd.read_csv(sub_file,header = None,sep = "\t",names = ['question','answer'],quoting = 3)
+    # datas.append(submit)
     return tuple(datas)
 def sentence_index(sen, alphabet, input_lens):
     sen = sen.split()
@@ -466,17 +462,8 @@ def prepare(cropuses,is_embedding_needed = False,dim = 50,fresh = False):
                     if count % 10000 == 0:
                         print count
                     tokens = cut(sentence)
-                    # print "#".join(tokens)
                     for token in set(tokens):
-                        if is_stemmed_needed:
-                            # try:
-                            alphabet.add(stemmer.stem(token.decode('utf-8')))
-                            # except Exception as e:
-                            #     alphabet.add(token)
-                            #     print type(e)
-                            
-                        else:
-                            alphabet.add(token)
+                        alphabet.add(token)
         print len(alphabet.keys())
         pickle.dump(alphabet,open(vocab_file,'w'))
     if is_embedding_needed:
@@ -818,10 +805,9 @@ def type(row):
             return 0
     return 0
 def model_mixed():
-    data_dir = "data/" + 'nlpcc'
-    test_file = os.path.join(data_dir,"test.txt")
-    test = pd.read_csv(test_file,header=None,sep="\t",names=["question","answer","flag"],quoting =3)
-    predicted = pd.read_csv('../QA/train.QApair.TJU_IR_QA.score',names = ['score'])
+    test_file = 'dbqa.txt'
+    test = pd.read_csv(test_file,header=None,sep="\t",names=["flag","question","answer"],quoting =3)
+    predicted = pd.read_csv('Bot_submit',names = ['score'])
     map_mrr_test = evaluation.evaluationBypandas(test,predicted)
     print map_mrr_test
 def questionType(sentence):

@@ -69,7 +69,8 @@ tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
 print("\nParameters:")
-print FLAGS.__flags
+for attr, value in sorted(FLAGS.__flags.items()):
+    print(("{}={}".format(attr.upper(), value)))
 log_dir = 'log/'+ timeDay
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
@@ -97,145 +98,33 @@ def predict(sess,cnn,test,alphabet,batch_size,q_len,a_len):
             score = sess.run(cnn.score12, feed_dict)
         scores.extend(score)
     return np.array(scores[:len(test)])
-
-@log_time_delta
-def prediction(sess,cnn,test,alphabet,q_len,a_len):
-    question,answer,overlap = parseData(test,alphabet,q_len,a_len)
-    feed_dict = {
-        cnn.question:question,
-        cnn.answer:answer
-    }
-    score = sess.run(cnn.scores,feed_dict)
-    return score
-
-@log_time_delta
-def test_point_wise():
-    train,test,dev = load(FLAGS.data,filter = True)
-    q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
-    a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
-    print 'train question unique:{}'.format(len(train['question'].unique()))
-    print 'train length',len(train)
-    print 'test length', len(test)
-    print 'dev length', len(dev)
-
-    alphabet,embeddings = prepare([train,test,dev],dim = FLAGS.embedding_dim,is_embedding_needed = True,fresh = True)
-    print 'alphabet:',len(alphabet)
-    with tf.Graph().as_default():
-        # with tf.device("/cpu:0"):
-        session_conf = tf.ConfigProto(
-            allow_soft_placement=FLAGS.allow_soft_placement,
-            log_device_placement=FLAGS.log_device_placement)
-        sess = tf.Session(config=session_conf)
-        with sess.as_default(),open(precision,"w") as log:
-
-            # train,test,dev = load("trec",filter=True)
-            # alphabet,embeddings = prepare([train,test,dev],is_embedding_needed = True)
-            cnn = QA(
-                max_len_left = q_max_sent_length,
-                max_len_right = a_max_sent_length,
-                vocab_size = len(alphabet),
-                embedding_size = FLAGS.embedding_dim,
-                batch_size = FLAGS.batch_size,
-                embeddings = embeddings,
-                dropout_keep_prob = FLAGS.dropout_keep_prob,
-                filter_sizes = list(map(int, FLAGS.filter_sizes.split(","))),
-                num_filters = FLAGS.num_filters,
-                l2_reg_lambda = FLAGS.l2_reg_lambda,
-                is_Embedding_Needed = True,
-                trainable = FLAGS.trainable,
-                is_overlap = FLAGS.overlap_needed)
-
-            # Define Training procedure
-            global_step = tf.Variable(0, name="global_step", trainable = False)
-            optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
-            grads_and_vars = optimizer.compute_gradients(cnn.loss)
-            train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
-            saver = tf.train.Saver(tf.all_variables(), max_to_keep=20)
-            # Initialize all variables
-            sess.run(tf.global_variables_initializer())
-
-            # seq_process(train, alphabet)
-            # seq_process(test, alphabet)
-            for i in range(100):
-                if FLAGS.overlap_needed == False:
-
-                    for x_left_batch, x_right_batch, y_batch in batch_gen_with_point_wise(train,alphabet,FLAGS.batch_size,overlap = FLAGS.overlap_needed,
-                        q_len = q_max_sent_length,a_len = a_max_sent_length):
-                        feed_dict = {
-                            cnn.question: x_left_batch,
-                            cnn.answer: x_right_batch,
-                            cnn.input_y: y_batch
-                        }
-                        _, step,loss, accuracy,pred ,scores,see = sess.run(
-                        [train_op, global_step,cnn.loss, cnn.accuracy,cnn.predictions,cnn.scores,cnn.see],
-                        feed_dict)
-                        time_str = datetime.datetime.now().isoformat()
-                       
-                        print("{}: step {}, loss {:g}, acc {:g}  ".format(time_str, step, loss, accuracy))
-                else:
-                    for x_left_batch, x_right_batch, y_batch ,overlap in batch_gen_with_point_wise(train,alphabet,FLAGS.batch_size,overlap = FLAGS.overlap_needed,
-                        q_len = q_max_sent_length,a_len = a_max_sent_length):
-                        feed_dict = {
-                            cnn.question: x_left_batch,
-                            cnn.answer: x_right_batch,
-                            cnn.overlap:overlap,
-                            cnn.input_y: y_batch
-                        }
-                        _, step,loss, accuracy,pred ,scores ,see= sess.run(
-                        [train_op, global_step,cnn.loss, cnn.accuracy,cnn.predictions,cnn.scores,cnn.see],
-                        feed_dict)
-                        time_str = datetime.datetime.now().isoformat()
-                        print("{}: step {}, loss {:g}, acc {:g}  ".format(time_str, step, loss, accuracy))
-                    # print loss
-                predicted_train = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                predicted = predict(sess,cnn,train,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                map_mrr_train = evaluation.evaluationBypandas(train,predicted[:,-1])
-                predicted = predict(sess,cnn,test,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                map_mrr_test = evaluation.evaluationBypandas(test,predicted[:,-1])
-                # predicted = predict(sess,cnn,dev,alphabet,FLAGS.batch_size,q_max_sent_length,a_max_sent_length)
-                # map_mrr_dev = evaluation.evaluationBypandas(dev,predicted[:,-1])
-                # map_mrr_train = evaluation.evaluationBypandas(train,predicted_train[:,-1])
-                # print evaluation.evaluationBypandas(train,predicted_train[:,-1])
-                print "{}:train epoch:map mrr {}".format(i,map_mrr_train)
-                print "{}:test epoch:map mrr {}".format(i,map_mrr_test)
-                # print "{}:dev epoch:map mrr {}".format(i,map_mrr_dev)
-                # line = " {}:epoch: map_train{}----map_test{}----map_dev{}".format(i,map_mrr_train[0],map_mrr_test[0],map_mrr_dev[0])
-                line = " {}:epoch: map_test{}".format(i,map_mrr_test[0])
-                log.write(line + '\n')
-                log.flush()
-            log.close()
-
 @log_time_delta
 def test_pair_wise(dns = FLAGS.dns):
-    train,test,dev,submit = load(FLAGS.data,filter = False)
+    train,test,dev = load(FLAGS.data,filter = False)
     train = train.fillna('')
     test = test.fillna('')
     dev = dev.fillna('')
-    submit = submit.fillna('')
-    # replace_number([train,test,dev])
-    # train = sample_data(train,frac = FLAGS.sample_train)
-    # test = sample_data(train,frac = FLAGS.sample_train)
-    # dev = sample_data(dev,frac = FLAGS.sample_train)
-    train = train[:1000]
-    test = test[:1000]
-    dev = dev[:1000]
-    submit = submit[:1000]
-    q_max_sent_length = 40#max(map(lambda x:len(x),train['question'].str.split()))
-    a_max_sent_length = 75#max(map(lambda x:len(x),train['answer'].str.split()))
+    # train = train[:1000]
+    # test = test[:1000]
+    # dev = dev[:1000]
+    # submit = submit[:1000]
+    q_max_sent_length = max(map(lambda x:len(x),train['question'].str.split()))
+    a_max_sent_length = max(map(lambda x:len(x),train['answer'].str.split()))
     print 'q_question_length:{} a_question_length:{}'.format(q_max_sent_length,a_max_sent_length)
     print 'train question unique:{}'.format(len(train['question'].unique()))
     print 'train length',len(train)
     print 'test length', len(test)
     print 'dev length', len(dev)
-    alphabet,embeddings = prepare([train,test,dev,submit],dim = FLAGS.embedding_dim,is_embedding_needed = True,fresh = FLAGS.fresh)
+    alphabet,embeddings = prepare([train,test,dev],dim = FLAGS.embedding_dim,is_embedding_needed = True,fresh = FLAGS.fresh)
     # alphabet,embeddings = prepare_300([train,test,dev])
     print 'alphabet:',len(alphabet)
     with tf.Graph().as_default(), tf.device("/gpu:0"):
         # with tf.device("/cpu:0"):
-        session_conf = tf.ConfigProto(
-            allow_soft_placement = FLAGS.allow_soft_placement,
-            log_device_placement = FLAGS.log_device_placement)
-        sess = tf.Session(config = session_conf)
+        session_conf = tf.ConfigProto()
+        session_conf.allow_soft_placement = FLAGS.allow_soft_placement
+        session_conf.log_device_placement = FLAGS.log_device_placement
+        session_conf.gpu_options.allow_growth = True
+        sess = tf.Session(config=session_conf)
         with sess.as_default(),open(precision,"w") as log:
             log.write(str(FLAGS.__flags) + '\n')
             # train,test,dev = load("trec",filter=True)
